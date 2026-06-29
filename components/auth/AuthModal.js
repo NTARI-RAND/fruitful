@@ -60,7 +60,7 @@ export default function AuthModal({ tab: initialTab = 'login', onClose }) {
   return (
     <div className="overlay" style={{ zIndex: 300 }} onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
       <div style={{ background: 'var(--white)', borderRadius: 'var(--r-xl)', width: '100%', maxWidth: 400, padding: 40, boxShadow: 'var(--shadow-lg)', animation: 'slideUp .2s ease' }}>
-        <div style={{ fontFamily: 'var(--font-serif)', fontSize: 26, fontWeight: 900, color: 'var(--moss)', marginBottom: 4 }}>Agrinet</div>
+        <div style={{ fontFamily: 'var(--font-serif)', fontSize: 26, fontWeight: 900, color: 'var(--moss)', marginBottom: 4 }}>Fruitful</div>
         <div style={{ fontSize: 13, color: 'var(--text3)', marginBottom: 28 }}>{t('Marketplace agrícola descentralizado')}</div>
 
         <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', marginBottom: 24 }}>
