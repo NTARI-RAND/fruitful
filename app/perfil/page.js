@@ -264,8 +264,9 @@ function PerfilInner() {
                       </div>
                     : txs.map((tx, i) => {
                         const isBuyer = tx.buyer_id === user.id;
+                        const matured = !tx.settle_at || new Date(tx.settle_at) <= new Date();
                         const canRate = ['paid', 'completed'].includes(tx.status) &&
-                          (isBuyer ? !tx.buyer_rated : !tx.seller_rated);
+                          (isBuyer ? !tx.buyer_rated && matured : !tx.seller_rated);
                         return (
                           <motion.div
                             key={tx.id}

@@ -97,6 +97,10 @@ export default function ContractModal({ transaction: tx, me, onClose, onChanged 
     <Modal onClose={onClose} maxWidth="560px">
       <ModalHeader title={tx.listing_title || t('Contrato')} onClose={onClose} />
 
+      {tx.settle_at && (
+        <p className="text-xs text-rust mb-3">🔒 {t('Liquidação na maturidade')}: {String(tx.settle_at).slice(0, 10)}</p>
+      )}
+
       {/* PING calendar */}
       {schedule.length > 0 && (
         <div className="bg-cream2 border border-[var(--border-c)] rounded-lg p-3 mb-4 text-sm">
