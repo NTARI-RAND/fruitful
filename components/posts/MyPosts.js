@@ -17,6 +17,7 @@ export default function MyPosts({ title, subtitle, types, defaultType, newLabel 
   const [posts, setPosts] = useState(null);
   const [selected, setSelected] = useState(null);
   const [creating, setCreating] = useState(false);
+  const [editing, setEditing] = useState(null);
 
   useEffect(() => {
     const u = getUser();
@@ -74,10 +75,16 @@ export default function MyPosts({ title, subtitle, types, defaultType, newLabel 
             {posts.map((p) => (
               <div key={p.id} className="relative group">
                 <ListingCard listing={p} onClick={setSelected} />
-                <button
-                  onClick={(e) => { e.stopPropagation(); onDelete(p.id); }}
-                  className="absolute top-2 right-2 z-10 bg-white/90 hover:bg-rust hover:text-white rounded-full w-7 h-7 text-sm shadow opacity-0 group-hover:opacity-100 transition"
-                  title={t('Remover')}>✕</button>
+                <div className="absolute top-2 right-2 z-10 flex gap-1 opacity-0 group-hover:opacity-100 transition">
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setEditing(p); }}
+                    className="bg-white/90 hover:bg-moss hover:text-white rounded-full w-7 h-7 text-sm shadow"
+                    title={t('Editar')}>✎</button>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onDelete(p.id); }}
+                    className="bg-white/90 hover:bg-rust hover:text-white rounded-full w-7 h-7 text-sm shadow"
+                    title={t('Remover')}>✕</button>
+                </div>
                 {p.status && p.status !== 'active' && (
                   <span className="absolute top-2 left-2 z-10 badge-agro badge-wheat text-[10px]">{p.status}</span>
                 )}
@@ -89,6 +96,7 @@ export default function MyPosts({ title, subtitle, types, defaultType, newLabel 
 
       {selected && <ListingDetail listing={selected} onClose={() => setSelected(null)} />}
       {creating && <NewPostModal initialType={defaultType} onClose={() => setCreating(false)} onCreated={load} />}
+      {editing && <NewPostModal existing={editing} onClose={() => setEditing(null)} onCreated={load} />}
     </div>
   );
 }

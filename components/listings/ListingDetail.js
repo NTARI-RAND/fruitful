@@ -5,6 +5,7 @@ import { Modal, ModalHeader } from '@/components/ui/Modal';
 import { catLabel, CAT_EMOJI, formatCurrency, formatDate } from '@/lib/format';
 import { Badge } from '@/components/ui/Badge';
 import { api } from '@/lib/api';
+import { getUser } from '@/lib/auth';
 import { useToast } from '@/components/ui/Toast';
 import { useRouter } from 'next/navigation';
 import { useI18n } from '@/lib/i18n';
@@ -26,6 +27,23 @@ export default function ListingDetail({ listing, onClose }) {
   const l = listing;
   const isPlan = l.post_type === 'plan_producer' || l.post_type === 'plan_consumer';
   const isConsumerPlan = l.post_type === 'plan_consumer';
+  const me = getUser();
+  const isOwner = me?.id && l.user_id && me.id === l.user_id;
+  const [messaging, setMessaging] = useState(false);
+
+  async function message() {
+    if (!me) return toast(t('Faça login para enviar mensagens'), 'error');
+    setMessaging(true);
+    try {
+      const c = await api('/conversations', 'POST', { post_id: l.id });
+      onClose();
+      router.push('/chat/' + c.id);
+    } catch (e) {
+      toast(e.message, 'error');
+    } finally {
+      setMessaging(false);
+    }
+  }
 
   async function buy() {
     const q = parseFloat(qty);
@@ -118,17 +136,24 @@ export default function ListingDetail({ listing, onClose }) {
         )}
       </div>
 
-      <div className="flex gap-3">
-        <button
-          className="btn btn-primary flex-1"
-          onClick={buy}
-          disabled={loading}>
-          {loading
-            ? t('Aguarde...')
-            : isConsumerPlan ? `🤝 ${t('Atender pedido')}`
-            : isPlan ? `📋 ${t('Contratar plano')}`
-            : `🛒 ${t('Comprar agora')}`}
-        </button>
+      <div className="flex gap-3 flex-wrap">
+        {!isOwner && (
+          <button
+            className="btn btn-primary flex-1"
+            onClick={buy}
+            disabled={loading}>
+            {loading
+              ? t('Aguarde...')
+              : isConsumerPlan ? `🤝 ${t('Atender pedido')}`
+              : isPlan ? `📋 ${t('Contratar plano')}`
+              : `🛒 ${t('Comprar agora')}`}
+          </button>
+        )}
+        {!isOwner && (
+          <button className="btn btn-outline" onClick={message} disabled={messaging}>
+            💬 {t('Mensagem')}
+          </button>
+        )}
         <button className="btn btn-ghost" onClick={onClose}>{t('Cancelar')}</button>
       </div>
     </Modal>

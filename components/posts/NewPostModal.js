@@ -35,11 +35,24 @@ function Field({ f, value, onChange }) {
   );
 }
 
-export default function NewPostModal({ onClose, onCreated, initialType = null }) {
+export default function NewPostModal({ onClose, onCreated, initialType = null, existing = null }) {
   const toast = useToast();
-  const [type, setType] = useState(initialType);
-  const [values, setValues] = useState({});
-  const [media, setMedia] = useState([]);
+  const [type, setType] = useState(existing ? existing.post_type : initialType);
+  const [values, setValues] = useState(() => {
+    if (!existing) return {};
+    const v = {};
+    const form = POST_TYPE_FORMS[existing.post_type];
+    if (form) {
+      for (const f of form.fields) {
+        const top = existing[f.key];
+        const pay = existing.payload?.[f.key];
+        const val = top !== undefined && top !== null ? top : pay;
+        if (val !== undefined && val !== null) v[f.key] = val;
+      }
+    }
+    return v;
+  });
+  const [media, setMedia] = useState(existing?.media || []);
   const [uploading, setUploading] = useState(false);
   const [loading, setLoading] = useState(false);
 
@@ -72,8 +85,14 @@ export default function NewPostModal({ onClose, onCreated, initialType = null })
     if (missing.length) return toast('Please fill in: ' + missing.map((f) => f.label).join(', '), 'error');
     setLoading(true);
     try {
-      await api('/posts', 'POST', buildPostBody(type, values, media));
-      toast('Post published!');
+      const body = buildPostBody(type, values, media);
+      if (existing) {
+        await api('/posts/' + existing.id, 'PUT', body);
+        toast('Changes saved');
+      } else {
+        await api('/posts', 'POST', body);
+        toast('Post published!');
+      }
       onClose();
       onCreated?.();
     } catch (e) {
@@ -85,7 +104,7 @@ export default function NewPostModal({ onClose, onCreated, initialType = null })
 
   return (
     <Modal onClose={onClose} maxWidth="560px">
-      <ModalHeader title={type ? `New ${POST_TYPE_FORMS[type].label}` : 'What are you posting?'} onClose={onClose} />
+      <ModalHeader title={existing ? `Edit ${POST_TYPE_FORMS[type]?.label || 'post'}` : type ? `New ${POST_TYPE_FORMS[type].label}` : 'What are you posting?'} onClose={onClose} />
 
       {!type ? (
         <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))' }}>
@@ -118,9 +137,9 @@ export default function NewPostModal({ onClose, onCreated, initialType = null })
           </div>
 
           <div className="flex gap-3 mt-4">
-            <button className="btn btn-ghost" onClick={() => setType(null)}>← Back</button>
+            {!existing && <button className="btn btn-ghost" onClick={() => setType(null)}>← Back</button>}
             <button className="btn btn-primary flex-1" onClick={submit} disabled={loading}>
-              {loading ? 'Publishing…' : 'Publish'}
+              {existing ? (loading ? 'Saving…' : 'Save changes') : (loading ? 'Publishing…' : 'Publish')}
             </button>
           </div>
         </div>
