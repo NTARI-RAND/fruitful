@@ -22,6 +22,8 @@ export default function ContractModal({ transaction: tx, me, onClose, onChanged 
   const [toEmail, setToEmail] = useState('');
   const [price, setPrice] = useState('');
   const [transferring, setTransferring] = useState(false);
+  const [tranches, setTranches] = useState({ released: tx.tranches_released || 0, amount: Number(tx.released_amount || 0) });
+  const [releasingT, setReleasingT] = useState(false);
 
   const API = process.env.NEXT_PUBLIC_API_URL || '';
   const isSeller = me?.id === tx.seller_id;
@@ -66,6 +68,20 @@ export default function ContractModal({ transaction: tx, me, onClose, onChanged 
     finally { setPosting(false); }
   }
 
+  async function releaseNextTranche() {
+    setReleasingT(true);
+    try {
+      const r = await api(`/transactions/${tx.id}/release-tranche`, 'POST');
+      setTranches({ released: r.tranches_released, amount: tranches.amount + r.released });
+      toast(t('Pagamento parcial liberado!'));
+      onChanged?.();
+    } catch (e) {
+      toast(e.message, 'error');
+    } finally {
+      setReleasingT(false);
+    }
+  }
+
   async function transfer() {
     const p = parseFloat(price);
     if (!toEmail.trim()) return toast(t('E-mail do comprador'), 'error');
@@ -99,6 +115,23 @@ export default function ContractModal({ transaction: tx, me, onClose, onChanged 
 
       {tx.settle_at && (
         <p className="text-xs text-rust mb-3">🔒 {t('Liquidação na maturidade')}: {String(tx.settle_at).slice(0, 10)}</p>
+      )}
+
+      {tx.tranche_count && (
+        <div className="bg-cream2 border border-[var(--border-c)] rounded-lg p-3 mb-4">
+          <div className="text-[11px] font-semibold uppercase tracking-wide text-text3 mb-1">{t('Pagamentos por etapas')}</div>
+          <div className="text-sm text-soil">
+            {tranches.released} / {tx.tranche_count} {t('liberado')} · {formatCurrency(tranches.amount)} / {formatCurrency(tx.amount)}
+          </div>
+          {me?.id === tx.buyer_id && live && tranches.released < tx.tranche_count - 1 && (
+            <button className="btn btn-outline btn-sm mt-2" onClick={releaseNextTranche} disabled={releasingT}>
+              {releasingT ? t('Enviando...') : t('Liberar próximo pagamento')}
+            </button>
+          )}
+          {tranches.released >= tx.tranche_count - 1 && (
+            <p className="text-xs text-text3 mt-1">{t('O pagamento final é liberado pela sua avaliação.')}</p>
+          )}
+        </div>
       )}
 
       {/* PING calendar */}
