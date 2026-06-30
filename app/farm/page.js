@@ -8,7 +8,7 @@ export default function MyFarm() {
     <MyPosts
       title="Minha Fazenda"
       subtitle="Gerencie sua produção: planos, produtos, venda direta e agroturismo."
-      types={['direct_market', 'product', 'plan_producer', 'agrotourism']}
+      types={['direct_market', 'product', 'plan_producer', 'plan_consumer', 'agrotourism']}
       defaultType="direct_market"
       newLabel="Novo anúncio"
     />

@@ -11,10 +11,12 @@ import { useI18n } from '@/lib/i18n';
 
 // Whitepaper §4.5.2 General Broadcast — filter by post type.
 const POST_TYPES = [
-  { value: '',              label: 'Tudo',      emoji: '✨' },
-  { value: 'service',       label: 'Serviços',  emoji: '🧰' },
-  { value: 'direct_market', label: 'Mercado',   emoji: '🥕' },
-  { value: 'product',       label: 'Produtos',  emoji: '📦' },
+  { value: '',              label: 'Tudo',        emoji: '✨' },
+  { value: 'service',       label: 'Serviços',    emoji: '🧰' },
+  { value: 'direct_market', label: 'Mercado',     emoji: '🥕' },
+  { value: 'product',       label: 'Produtos',    emoji: '📦' },
+  { value: 'plan',          label: 'Planos',      emoji: '📋' },
+  { value: 'agrotourism',   label: 'Agroturismo', emoji: '🌄' },
 ];
 
 const STATES = ['SP','MG','PR','RS','GO','MT','MS','BA','SC','PE','CE','RO','PA'];
@@ -28,6 +30,8 @@ const DEMO = [
   { id: 'd6', post_type: 'product',       title: 'Sementes de Milho Híbrido', category: 'seeds_young', city: 'Cajamar',      state: 'SP', price: 320.00, quantity_available: 200 },
   { id: 'd7', post_type: 'product',       title: 'Trator New Holland T7.240', category: 'tools',       city: 'Cascavel',     state: 'PR', price: 480000, quantity_available: 1 },
   { id: 'd8', post_type: 'service',       title: 'Transporte de Grãos',       category: 'lr',          city: 'Uberaba',      state: 'MG', terms: 'R$ 4,50/km' },
+  { id: 'd9', post_type: 'plan_producer', title: 'Plano de Soja 2026',         city: 'Sorriso',      state: 'MT', price: 150.00, unit: 'saca', quantity_available: 800 },
+  { id: 'd10', post_type: 'agrotourism',  title: 'Tour na Fazenda Orgânica',   category: 'event',    city: 'Holambra',     state: 'SP', price: 45.00 },
 ];
 
 function MarketplaceInner() {
@@ -44,10 +48,14 @@ function MarketplaceInner() {
   const [filtersOpen, setFiltersOpen] = useState(false);
   const { t } = useI18n();
 
+  // The "Planos" pill groups both plan types (one post_type query param can't); filter client-side.
+  const isPlan = l => l.post_type === 'plan_consumer' || l.post_type === 'plan_producer';
+  const matchesType = l => !ptype || (ptype === 'plan' ? isPlan(l) : l.post_type === ptype);
+
   async function load() {
     setListings(null);
     let qs = '?status=active&limit=40';
-    if (ptype)  qs += '&post_type=' + ptype;
+    if (ptype && ptype !== 'plan') qs += '&post_type=' + ptype;
     if (stateF) qs += '&state=' + stateF;
     if (minP)   qs += '&minPrice=' + minP;
     if (maxP)   qs += '&maxPrice=' + maxP;
@@ -55,13 +63,14 @@ function MarketplaceInner() {
     try {
       const data = await api('/posts' + qs);
       let items = data.posts || data.listings || data || [];
+      if (ptype === 'plan') items = items.filter(isPlan);
       if (search) items = items.filter(l =>
         l.title.toLowerCase().includes(search.toLowerCase()) ||
         l.city?.toLowerCase().includes(search.toLowerCase())
       );
       setListings(items);
     } catch {
-      setListings(DEMO.filter(l => !ptype || l.post_type === ptype));
+      setListings(DEMO.filter(matchesType));
     }
   }
 
