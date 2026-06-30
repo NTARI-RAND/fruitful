@@ -78,7 +78,7 @@ export default function DisputeResolveModal({ dispute, onClose, onResolved }) {
                   <span className="text-xs text-text3">{LEVEL_LABELS[String(r.value)]}</span>
                   {r.voided ? <span className="text-[10px] uppercase tracking-wide text-text3 ml-auto">{t('Anulada')}</span> : null}
                 </div>
-                {r.comment && <div className="text-xs text-text2 mt-1 break-words">{r.comment}</div>}
+                {r.narrative && <div className="text-xs text-text2 mt-1 break-words">{r.narrative}</div>}
               </div>
             ))}
           </div>

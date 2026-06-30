@@ -17,6 +17,7 @@ export default function MyContracts() {
   const [pending, setPending] = useState(null);
   const [myRep, setMyRep] = useState(null);
   const [rateItem, setRateItem] = useState(null);
+  const [received, setReceived] = useState([]);
 
   useEffect(() => {
     const u = getUser();
@@ -27,18 +28,31 @@ export default function MyContracts() {
 
   async function load() {
     try {
-      const [p, rep] = await Promise.all([
+      const [p, rep, rec] = await Promise.all([
         api('/ratings/me/pending').catch(() => ({ pending: [] })),
         api('/ratings/me').catch(() => null),
+        api('/ratings/me/received').catch(() => ({ received: [] })),
       ]);
       setPending(p.pending || []);
       setMyRep(rep);
+      setReceived(rec.received || []);
     } catch {
       setPending([]);
     }
   }
 
+  async function contest(ratingId) {
+    const reason = prompt(t('Por que esta avaliação é injusta?'));
+    if (!reason || !reason.trim()) return;
+    try {
+      await api('/ratings/' + ratingId + '/contest', 'POST', { reason: reason.trim() });
+      load();
+    } catch (e) { alert(e.message); }
+  }
+
   if (!user) return null;
+
+  const openFlags = received.filter((r) => !r.voided);
 
   return (
     <div className="min-h-screen bg-cream">
@@ -82,6 +96,28 @@ export default function MyContracts() {
             </div>
           )}
         </div>
+
+        {/* ── FLAGS RECEIVED (contest a -1 made against you — either direction) ── */}
+        {openFlags.length > 0 && (
+          <div className="card-agro p-5 mt-5">
+            <div className="text-xs font-semibold uppercase tracking-widest text-rust mb-1">{t('Sinalizações recebidas')}</div>
+            <p className="text-xs text-text3 mb-4">{t('Uma avaliação “Sem confiança” contra você pode ser contestada para revisão.')}</p>
+            <div className="flex flex-col gap-3">
+              {openFlags.map((f) => (
+                <div key={f.id} className="tx-item">
+                  <div className="tx-icon text-rust">-1</div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-semibold text-soil">{t('Sem confiança')} · {f.rated_role}</div>
+                    <div className="text-xs text-text3 mt-1">{formatDate(f.created_at)}{f.contested ? ' · ' + t('contestada') : ''}</div>
+                  </div>
+                  {f.contested
+                    ? <span className="badge-agro badge-wheat text-[10px] self-center">{t('contestada')}</span>
+                    : <button className="btn btn-outline btn-sm self-center" onClick={() => contest(f.id)}>{t('Contestar')}</button>}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {rateItem && (
