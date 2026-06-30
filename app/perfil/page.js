@@ -11,6 +11,8 @@ import NewListingModal from '@/components/listings/NewListingModal';
 import { Modal, ModalHeader } from '@/components/ui/Modal';
 import { useToast } from '@/components/ui/Toast';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import LbtasDistribution from '@/components/ratings/LbtasDistribution';
+import RatePrompt from '@/components/ratings/RatePrompt';
 import { useI18n } from '@/lib/i18n';
 
 const HIST_ICON = {
@@ -42,13 +44,20 @@ function PerfilInner() {
   const [depAmt, setDepAmt]       = useState('');
   const [txDetail, setTxDetail]   = useState(null);
   const [loading, setLoading]     = useState(false);
+  const [myRep, setMyRep]         = useState(null);
+  const [rateTx, setRateTx]       = useState(null);
 
   useEffect(() => {
     const u = getUser();
     if (!u) { router.push('/'); return; }
     setUser(u);
     loadWallet();
+    loadMyRep();
   }, []);
+
+  async function loadMyRep() {
+    try { setMyRep(await api('/ratings/me')); } catch {}
+  }
 
   useEffect(() => {
     if (!user) return;
@@ -150,8 +159,13 @@ function PerfilInner() {
             <div className="flex gap-2 mt-2 flex-wrap">
               <Badge variant="green">{user.trust_level || 'new'}</Badge>
               {isAdmin(user) && <Badge variant="wheat">{t('Admin')}</Badge>}
-              <Badge variant="gray">Rep: {user.reputation_score ?? 0}</Badge>
             </div>
+            {myRep && (
+              <div className="mt-3">
+                <div className="text-[10px] font-semibold uppercase tracking-widest text-text3 mb-1">{t('Minha reputação')}</div>
+                <LbtasDistribution distribution={myRep.distribution} total={myRep.total} size="sm" />
+              </div>
+            )}
           </div>
           <button className="btn btn-ghost btn-sm self-start" onClick={() => { clearAuth(); router.push('/'); }}>
             {t('Sair')}
@@ -248,6 +262,8 @@ function PerfilInner() {
                       </div>
                     : txs.map((tx, i) => {
                         const isBuyer = tx.buyer_id === user.id;
+                        const canRate = ['paid', 'completed'].includes(tx.status) &&
+                          (isBuyer ? !tx.buyer_rated : !tx.seller_rated);
                         return (
                           <motion.div
                             key={tx.id}
@@ -267,6 +283,7 @@ function PerfilInner() {
                                 {tx.status === 'pending'  && isBuyer  && <button className="btn btn-primary btn-sm"  onClick={() => payTx(tx.id)}>{t('Pagar')}</button>}
                                 {tx.status === 'paid'     && !isBuyer && <button className="btn btn-ghost btn-sm"    onClick={() => releaseTx(tx.id)}>{t('Liberar')}</button>}
                                 {tx.status === 'paid'     && isBuyer  && <button className="btn btn-danger btn-sm"   onClick={() => disputeTx(tx.id)}>{t('Disputar')}</button>}
+                                {canRate && <button className="btn btn-primary btn-sm" onClick={() => setRateTx(tx)}>{t('Avaliar')}</button>}
                                 <button className="btn btn-ghost btn-sm" onClick={() => showTxDetail(tx.id)}>{t('Ver')}</button>
                               </div>
                             </div>
@@ -353,6 +370,16 @@ function PerfilInner() {
       )}
 
       {newListing && <NewListingModal onClose={() => setNewListing(false)} onCreated={loadMyListings} />}
+
+      {rateTx && (
+        <RatePrompt
+          transactionId={rateTx.id}
+          title={rateTx.listing_title}
+          counterparty={rateTx.buyer_id === user.id ? rateTx.seller_id : rateTx.buyer_id}
+          onClose={() => setRateTx(null)}
+          onRated={() => { loadTxs(); loadMyRep(); }}
+        />
+      )}
     </div>
   );
 }

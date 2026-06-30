@@ -1,28 +1,42 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { api } from '@/lib/api';
 import { getUser } from '@/lib/auth';
+import { formatCurrency, formatDate } from '@/lib/format';
 import { useI18n } from '@/lib/i18n';
+import LbtasDistribution from '@/components/ratings/LbtasDistribution';
+import RatePrompt from '@/components/ratings/RatePrompt';
 
-// Contracts/PING/transactions side (whitepaper §4.5.4-.5). The existing
-// transactions view + the LBTAS-gated escrow release wire in here in Phases 3-4.
-const SECTIONS = [
-  { icon: '📑', title: 'Plans & PINGs', desc: 'Consumer/producer plans and the PING update schedule.' },
-  { icon: '⇄', title: 'Transactions', desc: 'Purchases, escrow holds, and settlement status.' },
-  { icon: '📅', title: 'PING Calendar', desc: 'Planting, harvest, and PING report dates.' },
-  { icon: '⭐', title: 'LBTAS Ratings', desc: 'One −1…+4 rating per transaction; required before escrow release.' },
-];
-
+// Contracts side (whitepaper §4.5.4-.5). Phase 3 surfaces the LBTAS prompt feed
+// (transactions awaiting your rating) and your own reputation distribution.
 export default function MyContracts() {
   const router = useRouter();
   const { t } = useI18n();
   const [user, setUser] = useState(null);
+  const [pending, setPending] = useState(null);
+  const [myRep, setMyRep] = useState(null);
+  const [rateItem, setRateItem] = useState(null);
 
   useEffect(() => {
     const u = getUser();
     if (!u) { router.push('/'); return; }
     setUser(u);
+    load();
   }, []);
+
+  async function load() {
+    try {
+      const [p, rep] = await Promise.all([
+        api('/ratings/me/pending').catch(() => ({ pending: [] })),
+        api('/ratings/me').catch(() => null),
+      ]);
+      setPending(p.pending || []);
+      setMyRep(rep);
+    } catch {
+      setPending([]);
+    }
+  }
 
   if (!user) return null;
 
@@ -31,17 +45,54 @@ export default function MyContracts() {
       <div style={{ maxWidth: 1000, margin: '0 auto', padding: 'clamp(20px,3vw,40px) var(--page-pad)' }}>
         <h1 className="font-serif text-3xl font-black text-soil mb-1">{t('Meus Contratos')}</h1>
         <p className="text-sm text-text3 mb-6">{t('Acompanhe planos, PINGs, transações e avaliações LBTAS.')}</p>
-        <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(min(240px,100%),1fr))' }}>
-          {SECTIONS.map(s => (
-            <div key={s.title} className="card-agro p-5 flex flex-col">
-              <div className="text-2xl mb-2">{s.icon}</div>
-              <div className="font-semibold text-soil">{s.title}</div>
-              <div className="text-sm text-text3 mt-1 flex-1">{s.desc}</div>
-              <span className="badge-agro badge-wheat text-[10px] mt-3 self-start">{t('Em breve')}</span>
+
+        {/* ── MY REPUTATION ── */}
+        <div className="card-agro p-5 mb-5">
+          <div className="text-xs font-semibold uppercase tracking-widest text-text3 mb-3">{t('Minha reputação')}</div>
+          <LbtasDistribution distribution={myRep?.distribution} total={myRep?.total} size="md" />
+          <p className="text-xs text-text3 mt-3 italic">{t('Reputação é uma distribuição, nunca uma média.')}</p>
+        </div>
+
+        {/* ── PENDING RATINGS (the bidirectional prompt feed) ── */}
+        <div className="card-agro p-5">
+          <div className="text-xs font-semibold uppercase tracking-widest text-text3 mb-1">{t('Avaliações pendentes')}</div>
+          <p className="text-xs text-text3 mb-4">{t('Avalie suas transações para construir confiança na rede.')}</p>
+
+          {pending === null ? (
+            <div className="flex flex-col gap-2">{Array(2).fill(0).map((_, i) => <div key={i} className="skeleton h-16 rounded-xl" />)}</div>
+          ) : pending.length === 0 ? (
+            <div className="flex flex-col items-center py-10 gap-2">
+              <span className="text-3xl">✅</span>
+              <p className="text-sm text-text3">{t('Nada pendente para avaliar')}</p>
             </div>
-          ))}
+          ) : (
+            <div className="flex flex-col gap-3">
+              {pending.map((item) => (
+                <div key={item.transaction_id} className="tx-item">
+                  <div className="tx-icon">⭐</div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-[15px] font-semibold text-soil leading-tight">{item.listing_title || t('Produto')}</div>
+                    <div className="text-xs text-text3 mt-1">
+                      {item.role === 'buyer' ? t('Compra') : t('Venda')} · {formatCurrency(item.amount)} · {formatDate(item.created_at)}
+                    </div>
+                  </div>
+                  <button className="btn btn-primary btn-sm self-center" onClick={() => setRateItem(item)}>{t('Avaliar')}</button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
+
+      {rateItem && (
+        <RatePrompt
+          transactionId={rateItem.transaction_id}
+          title={rateItem.listing_title}
+          counterparty={rateItem.counterparty_id}
+          onClose={() => setRateItem(null)}
+          onRated={load}
+        />
+      )}
     </div>
   );
 }
