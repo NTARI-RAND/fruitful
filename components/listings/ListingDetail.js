@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Modal, ModalHeader } from '@/components/ui/Modal';
 import { catLabel, CAT_EMOJI, formatCurrency, formatDate } from '@/lib/format';
@@ -30,6 +30,12 @@ export default function ListingDetail({ listing, onClose }) {
   const me = getUser();
   const isOwner = me?.id && l.user_id && me.id === l.user_id;
   const [messaging, setMessaging] = useState(false);
+  const [alloc, setAlloc] = useState(null);
+
+  useEffect(() => {
+    if (!isPlan) return;
+    api(`/posts/${l.id}/contracts`).then(setAlloc).catch(() => {});
+  }, []);
 
   async function message() {
     if (!me) return toast(t('Faça login para enviar mensagens'), 'error');
@@ -100,6 +106,14 @@ export default function ListingDetail({ listing, onClose }) {
           <div className="text-xs text-text3">{l.unit}</div>
         </div>
       </div>
+
+      {/* PLAN SHARE ALLOCATION */}
+      {isPlan && alloc && alloc.total != null && (
+        <div className="text-sm text-text3 mb-4">
+          <span className="font-semibold text-soil">{alloc.allocated}</span> / {alloc.total} {t('contratado')} · {alloc.backer_count} {t('apoiadores')}
+          {alloc.contract_shares === 'none' && <span className="text-rust"> · {t('Plano completo (não divisível)')}</span>}
+        </div>
+      )}
 
       {/* DESCRIPTION */}
       {l.description && (

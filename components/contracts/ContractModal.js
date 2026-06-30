@@ -84,18 +84,44 @@ export default function ContractModal({ transaction: tx, me, onClose, onChanged 
   const reports = data?.reports || [];
   const past = schedule.filter((s) => s.status === 'past').length;
   const next = schedule.find((s) => s.status === 'upcoming');
+  const reportTimes = reports.map((r) => new Date(r.created_at).getTime());
+
+  // Did the producer post a report within this checkpoint's window?
+  function reportedAt(i) {
+    const start = new Date(schedule[i].date).getTime();
+    const end = i + 1 < schedule.length ? new Date(schedule[i + 1].date).getTime() : Infinity;
+    return reportTimes.some((t2) => t2 >= start && t2 < end);
+  }
 
   return (
     <Modal onClose={onClose} maxWidth="560px">
       <ModalHeader title={tx.listing_title || t('Contrato')} onClose={onClose} />
 
-      {/* PING schedule summary */}
+      {/* PING calendar */}
       {schedule.length > 0 && (
         <div className="bg-cream2 border border-[var(--border-c)] rounded-lg p-3 mb-4 text-sm">
           <div className="text-[11px] font-semibold uppercase tracking-wide text-text3 mb-1">{t('Cronograma PING')}</div>
-          <div className="text-soil">
+          <div className="text-soil mb-2">
             {t('Cadência')}: {t(RATE_LABEL[data?.ping_rate] || 'Weekly')} · {past}/{schedule.length} {t('checkpoints')}
             {next && <> · {t('Próximo')}: {next.date}</>}
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {schedule.map((s, i) => {
+              const isNext = next && s.date === next.date;
+              const reported = reportedAt(i);
+              return (
+                <span
+                  key={s.date}
+                  title={reported ? t('Atualização publicada') : s.status === 'past' ? t('checkpoints') : t('Próximo')}
+                  className={`text-[11px] px-2 py-1 rounded-md border tabular-nums ${
+                    reported ? 'bg-moss-light border-moss/40 text-soil'
+                      : s.status === 'past' ? 'bg-cream border-[var(--border-c)] text-text3'
+                      : 'border-[var(--border-c)] text-text3'
+                  } ${isNext ? 'ring-1 ring-moss' : ''}`}>
+                  {s.date.slice(5)}{reported ? ' 📷' : ''}
+                </span>
+              );
+            })}
           </div>
         </div>
       )}
