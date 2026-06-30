@@ -6,37 +6,36 @@ import { api } from '@/lib/api';
 import { getToken } from '@/lib/auth';
 import ListingCard, { ListingCardSkeleton } from '@/components/listings/ListingCard';
 import ListingDetail from '@/components/listings/ListingDetail';
-import NewListingModal from '@/components/listings/NewListingModal';
+import NewPostModal from '@/components/posts/NewPostModal';
 import { useI18n } from '@/lib/i18n';
 
-const CATEGORIES = [
-  { value: '',          label: 'Todos',      emoji: '🌿' },
-  { value: 'graos',    label: 'Grãos',      emoji: '🌾' },
-  { value: 'frutas',   label: 'Frutas',     emoji: '🍊' },
-  { value: 'gado',     label: 'Pecuária',   emoji: '🐄' },
-  { value: 'maquinas', label: 'Máquinas',   emoji: '🚜' },
-  { value: 'outros',   label: 'Outros',     emoji: '📦' },
+// Whitepaper §4.5.2 General Broadcast — filter by post type.
+const POST_TYPES = [
+  { value: '',              label: 'Tudo',      emoji: '✨' },
+  { value: 'service',       label: 'Serviços',  emoji: '🧰' },
+  { value: 'direct_market', label: 'Mercado',   emoji: '🥕' },
+  { value: 'product',       label: 'Produtos',  emoji: '📦' },
 ];
 
 const STATES = ['SP','MG','PR','RS','GO','MT','MS','BA','SC','PE','CE','RO','PA'];
 
 const DEMO = [
-  { id: 'd1', title: 'Soja Safra 2025 — Tipo 1',        category: 'graos',    city: 'Rondonópolis', state: 'MT', price: 145.50, unit: 'saca',  quantity_available: 500  },
-  { id: 'd2', title: 'Milho Granado Premium',            category: 'graos',    city: 'Sorriso',      state: 'MT', price: 78.00,  unit: 'saca',  quantity_available: 1200 },
-  { id: 'd3', title: 'Laranja Pera Rio',                 category: 'frutas',   city: 'Limeira',      state: 'SP', price: 2.80,   unit: 'kg',    quantity_available: 8000 },
-  { id: 'd4', title: 'Nelore Boi Gordo',                 category: 'gado',     city: 'Araçatuba',    state: 'SP', price: 320.00, unit: 'cabeça',quantity_available: 45   },
-  { id: 'd5', title: 'Café Arábica Especial',            category: 'graos',    city: 'Varginha',     state: 'MG', price: 980.00, unit: 'saca',  quantity_available: 30   },
-  { id: 'd6', title: 'Tomate Italiano Hidropônica',      category: 'frutas',   city: 'Cajamar',      state: 'SP', price: 3.20,   unit: 'kg',    quantity_available: 2500 },
-  { id: 'd7', title: 'Trator New Holland T7.240',        category: 'maquinas', city: 'Cascavel',     state: 'PR', price: 480000, unit: 'un.',   quantity_available: 1    },
-  { id: 'd8', title: 'Feijão Carioca Safra Nova',        category: 'graos',    city: 'Uberaba',      state: 'MG', price: 220.00, unit: 'saca',  quantity_available: 150  },
+  { id: 'd1', post_type: 'direct_market', title: 'Soja Safra 2025 — Tipo 1', category: 'graos',       city: 'Rondonópolis', state: 'MT', price: 145.50, unit: 'saca', quantity_available: 500  },
+  { id: 'd2', post_type: 'direct_market', title: 'Milho Granado Premium',     category: 'graos',       city: 'Sorriso',      state: 'MT', price: 78.00,  unit: 'saca', quantity_available: 1200 },
+  { id: 'd3', post_type: 'direct_market', title: 'Laranja Pera Rio',          category: 'frutas',      city: 'Limeira',      state: 'SP', price: 2.80,   unit: 'kg',   quantity_available: 8000 },
+  { id: 'd4', post_type: 'service',       title: 'Colheita Mecanizada',       category: 'la',          city: 'Araçatuba',    state: 'SP', terms: 'R$ 90/hora — mín. 4h' },
+  { id: 'd5', post_type: 'direct_market', title: 'Café Arábica Especial',     category: 'graos',       city: 'Varginha',     state: 'MG', price: 980.00, unit: 'saca', quantity_available: 30 },
+  { id: 'd6', post_type: 'product',       title: 'Sementes de Milho Híbrido', category: 'seeds_young', city: 'Cajamar',      state: 'SP', price: 320.00, quantity_available: 200 },
+  { id: 'd7', post_type: 'product',       title: 'Trator New Holland T7.240', category: 'tools',       city: 'Cascavel',     state: 'PR', price: 480000, quantity_available: 1 },
+  { id: 'd8', post_type: 'service',       title: 'Transporte de Grãos',       category: 'lr',          city: 'Uberaba',      state: 'MG', terms: 'R$ 4,50/km' },
 ];
 
 function MarketplaceInner() {
   const params = useSearchParams();
   const [listings, setListings] = useState(null);
   const [selected, setSelected]   = useState(null);
-  const [newListing, setNewListing] = useState(false);
-  const [cat, setCat]   = useState(params.get('cat') || '');
+  const [newPost, setNewPost] = useState(false);
+  const [ptype, setPtype]   = useState(params.get('type') || '');
   const [search, setSearch] = useState('');
   const [stateF, setStateF] = useState('');
   const [minP, setMinP] = useState('');
@@ -48,28 +47,29 @@ function MarketplaceInner() {
   async function load() {
     setListings(null);
     let qs = '?status=active&limit=40';
-    if (cat)    qs += '&category=' + cat;
+    if (ptype)  qs += '&post_type=' + ptype;
     if (stateF) qs += '&state=' + stateF;
     if (minP)   qs += '&minPrice=' + minP;
     if (maxP)   qs += '&maxPrice=' + maxP;
+    if (sort)   qs += '&sort=' + sort;
     try {
-      const data = await api('/listings' + qs);
-      let items = data.listings || data || [];
+      const data = await api('/posts' + qs);
+      let items = data.posts || data.listings || data || [];
       if (search) items = items.filter(l =>
         l.title.toLowerCase().includes(search.toLowerCase()) ||
         l.city?.toLowerCase().includes(search.toLowerCase())
       );
       setListings(items);
     } catch {
-      setListings(DEMO.filter(l => !cat || l.category === cat));
+      setListings(DEMO.filter(l => !ptype || l.post_type === ptype));
     }
   }
 
-  useEffect(() => { load(); }, [cat, stateF, sort]);
+  useEffect(() => { load(); }, [ptype, stateF, sort]);
 
   function openNew() {
     if (!getToken()) return alert(t('Faça login para anunciar'));
-    setNewListing(true);
+    setNewPost(true);
   }
 
   const filtered = listings?.filter(l =>
@@ -84,7 +84,7 @@ function MarketplaceInner() {
       <div className="bg-cream2 border-b border-[var(--border-c)]" style={{ padding: 'clamp(24px,4vw,48px) var(--page-pad) clamp(20px,3vw,36px)' }}>
         <motion.div initial={{ opacity: 0, y: -12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .4 }}>
           <h1 className="font-serif text-3xl md:text-4xl font-black text-soil mb-1">{t('Marketplace')}</h1>
-          <p className="text-sm text-text3">{t('Produtos agrícolas de produtores de todo o Brasil')}</p>
+          <p className="text-sm text-text3">{t('Produtos agrícolas e serviços de produtores de todo o Brasil')}</p>
         </motion.div>
 
         {/* SEARCH BAR */}
@@ -111,15 +111,15 @@ function MarketplaceInner() {
           </button>
         </motion.div>
 
-        {/* CATEGORY PILLS */}
+        {/* POST-TYPE PILLS */}
         <motion.div
           initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: .4, delay: .2 }}
           className="flex gap-2 mt-4 flex-wrap">
-          {CATEGORIES.map(c => (
+          {POST_TYPES.map(c => (
             <button
               key={c.value}
-              onClick={() => setCat(c.value)}
-              className={`cat-pill ${cat === c.value ? 'active' : ''}`}>
+              onClick={() => setPtype(c.value)}
+              className={`cat-pill ${ptype === c.value ? 'active' : ''}`}>
               <span>{c.emoji}</span> {t(c.label)}
             </button>
           ))}
@@ -202,15 +202,15 @@ function MarketplaceInner() {
                 className="flex flex-col items-center py-20 gap-3">
                 <span className="text-5xl">🌾</span>
                 <p className="text-text3 text-sm">{t('Nenhum produto encontrado')}</p>
-                <button className="btn btn-ghost btn-sm" onClick={() => { setCat(''); setSearch(''); setStateF(''); load(); }}>{t('Limpar filtros')}</button>
+                <button className="btn btn-ghost btn-sm" onClick={() => { setPtype(''); setSearch(''); setStateF(''); load(); }}>{t('Limpar filtros')}</button>
               </motion.div>
             )}
           </AnimatePresence>
         </div>
       </div>
 
-      {selected   && <ListingDetail listing={selected} onClose={() => setSelected(null)} />}
-      {newListing && <NewListingModal onClose={() => setNewListing(false)} onCreated={load} />}
+      {selected && <ListingDetail listing={selected} onClose={() => setSelected(null)} />}
+      {newPost  && <NewPostModal onClose={() => setNewPost(false)} onCreated={load} />}
     </div>
   );
 }
