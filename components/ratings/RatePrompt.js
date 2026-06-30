@@ -33,7 +33,13 @@ export default function RatePrompt({ transactionId, title, counterparty, release
         rating: value,
         comment: comment.trim() || undefined,
       });
-      toast(res?.escrowReleased ? t('Pagamento liberado ao vendedor!') : t('Avaliação registrada!'));
+      toast(
+        res?.disputeOpened
+          ? t('Disputa aberta — fundos congelados para análise.')
+          : res?.escrowReleased
+            ? t('Pagamento liberado ao vendedor!')
+            : t('Avaliação registrada!')
+      );
       onClose();
       onRated?.();
     } catch (e) {
@@ -51,8 +57,10 @@ export default function RatePrompt({ transactionId, title, counterparty, release
       {counterparty && <p className="text-xs text-text3 mb-4">{t('Avaliando')}: {counterparty}</p>}
 
       {releasesEscrow && (
-        <div className="mb-4 text-xs bg-wheat/10 border border-wheat/40 rounded-lg p-2.5 text-soil leading-snug">
-          🔒 {t('Ao confirmar, o pagamento retido é liberado ao vendedor.')}
+        <div className={`mb-4 text-xs rounded-lg p-2.5 leading-snug border ${value === -1 ? 'bg-rust/10 border-rust/40 text-rust' : 'bg-wheat/10 border-wheat/40 text-soil'}`}>
+          {value === -1
+            ? '⚠ ' + t('Uma avaliação Sem Confiança (-1) abre uma disputa e congela o pagamento para análise.')
+            : '🔒 ' + t('Ao confirmar, o pagamento retido é liberado ao vendedor. Uma avaliação -1 abre uma disputa.')}
         </div>
       )}
 
@@ -104,7 +112,11 @@ export default function RatePrompt({ transactionId, title, counterparty, release
       </div>
 
       <button className="btn btn-primary w-full mt-2" onClick={submit} disabled={loading || blocked}>
-        {loading ? t('Enviando...') : releasesEscrow ? t('Confirmar e liberar') : t('Enviar avaliação')}
+        {loading
+          ? t('Enviando...')
+          : releasesEscrow
+            ? (value === -1 ? t('Enviar e abrir disputa') : t('Confirmar e liberar'))
+            : t('Enviar avaliação')}
       </button>
     </Modal>
   );
