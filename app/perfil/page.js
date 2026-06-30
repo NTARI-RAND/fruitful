@@ -13,6 +13,7 @@ import { useToast } from '@/components/ui/Toast';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import ReputationPanel from '@/components/ratings/ReputationPanel';
 import RatePrompt from '@/components/ratings/RatePrompt';
+import ContractModal from '@/components/contracts/ContractModal';
 import { useI18n } from '@/lib/i18n';
 
 const HIST_ICON = {
@@ -46,6 +47,7 @@ function PerfilInner() {
   const [loading, setLoading]     = useState(false);
   const [myRep, setMyRep]         = useState(null);
   const [rateTx, setRateTx]       = useState(null);
+  const [contractTx, setContractTx] = useState(null);
 
   useEffect(() => {
     const u = getUser();
@@ -284,6 +286,7 @@ function PerfilInner() {
                                 {tx.status === 'paid'     && !isBuyer && tx.buyer_rated && <button className="btn btn-ghost btn-sm" onClick={() => releaseTx(tx.id)}>{t('Liberar')}</button>}
                                 {tx.status === 'paid'     && isBuyer  && <button className="btn btn-danger btn-sm"   onClick={() => disputeTx(tx.id)}>{t('Disputar')}</button>}
                                 {canRate && <button className="btn btn-primary btn-sm" onClick={() => setRateTx(tx)}>{isBuyer && tx.status === 'paid' ? t('Confirmar e avaliar') : t('Avaliar')}</button>}
+                                {tx.post_id && <button className="btn btn-ghost btn-sm" onClick={() => setContractTx(tx)}>{t('Contrato')}</button>}
                                 <button className="btn btn-ghost btn-sm" onClick={() => showTxDetail(tx.id)}>{t('Ver')}</button>
                               </div>
                             </div>
@@ -379,6 +382,15 @@ function PerfilInner() {
           releasesEscrow={rateTx.buyer_id === user.id && rateTx.status === 'paid'}
           onClose={() => setRateTx(null)}
           onRated={() => { loadTxs(); loadMyRep(); loadWallet(); }}
+        />
+      )}
+
+      {contractTx && (
+        <ContractModal
+          transaction={contractTx}
+          me={user}
+          onClose={() => setContractTx(null)}
+          onChanged={() => { loadTxs(); loadWallet(); }}
         />
       )}
     </div>
