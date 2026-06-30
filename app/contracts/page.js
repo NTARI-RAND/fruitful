@@ -5,7 +5,7 @@ import { api } from '@/lib/api';
 import { getUser } from '@/lib/auth';
 import { formatCurrency, formatDate } from '@/lib/format';
 import { useI18n } from '@/lib/i18n';
-import LbtasDistribution from '@/components/ratings/LbtasDistribution';
+import ReputationPanel from '@/components/ratings/ReputationPanel';
 import RatePrompt from '@/components/ratings/RatePrompt';
 
 // Contracts side (whitepaper §4.5.4-.5). Phase 3 surfaces the LBTAS prompt feed
@@ -49,8 +49,8 @@ export default function MyContracts() {
         {/* ── MY REPUTATION ── */}
         <div className="card-agro p-5 mb-5">
           <div className="text-xs font-semibold uppercase tracking-widest text-text3 mb-3">{t('Minha reputação')}</div>
-          <LbtasDistribution distribution={myRep?.distribution} total={myRep?.total} size="md" />
-          <p className="text-xs text-text3 mt-3 italic">{t('Reputação é uma distribuição, nunca uma média.')}</p>
+          <ReputationPanel rep={myRep} size="md" />
+          <p className="text-xs text-text3 mt-3 italic">{t('Reputação é uma distribuição por papel, nunca uma média.')}</p>
         </div>
 
         {/* ── PENDING RATINGS (the bidirectional prompt feed) ── */}

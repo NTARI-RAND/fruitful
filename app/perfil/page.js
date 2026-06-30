@@ -11,7 +11,7 @@ import NewListingModal from '@/components/listings/NewListingModal';
 import { Modal, ModalHeader } from '@/components/ui/Modal';
 import { useToast } from '@/components/ui/Toast';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import LbtasDistribution from '@/components/ratings/LbtasDistribution';
+import ReputationPanel from '@/components/ratings/ReputationPanel';
 import RatePrompt from '@/components/ratings/RatePrompt';
 import { useI18n } from '@/lib/i18n';
 
@@ -160,10 +160,10 @@ function PerfilInner() {
               <Badge variant="green">{user.trust_level || 'new'}</Badge>
               {isAdmin(user) && <Badge variant="wheat">{t('Admin')}</Badge>}
             </div>
-            {myRep && (
+            {myRep && myRep.roles?.length > 0 && (
               <div className="mt-3">
-                <div className="text-[10px] font-semibold uppercase tracking-widest text-text3 mb-1">{t('Minha reputação')}</div>
-                <LbtasDistribution distribution={myRep.distribution} total={myRep.total} size="sm" />
+                <div className="text-[10px] font-semibold uppercase tracking-widest text-text3 mb-2">{t('Minha reputação')}</div>
+                <ReputationPanel rep={myRep} size="sm" />
               </div>
             )}
           </div>
