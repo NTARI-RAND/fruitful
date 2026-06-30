@@ -89,6 +89,7 @@ export default function MyContracts() {
           transactionId={rateItem.transaction_id}
           title={rateItem.listing_title}
           counterparty={rateItem.counterparty_id}
+          releasesEscrow={rateItem.role === 'buyer' && rateItem.status === 'paid'}
           onClose={() => setRateItem(null)}
           onRated={load}
         />

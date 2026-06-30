@@ -281,9 +281,9 @@ function PerfilInner() {
                               <div className="font-serif text-xl font-black text-soil">{formatCurrency(tx.amount)}</div>
                               <div className="flex gap-1.5 flex-wrap justify-end">
                                 {tx.status === 'pending'  && isBuyer  && <button className="btn btn-primary btn-sm"  onClick={() => payTx(tx.id)}>{t('Pagar')}</button>}
-                                {tx.status === 'paid'     && !isBuyer && <button className="btn btn-ghost btn-sm"    onClick={() => releaseTx(tx.id)}>{t('Liberar')}</button>}
+                                {tx.status === 'paid'     && !isBuyer && tx.buyer_rated && <button className="btn btn-ghost btn-sm" onClick={() => releaseTx(tx.id)}>{t('Liberar')}</button>}
                                 {tx.status === 'paid'     && isBuyer  && <button className="btn btn-danger btn-sm"   onClick={() => disputeTx(tx.id)}>{t('Disputar')}</button>}
-                                {canRate && <button className="btn btn-primary btn-sm" onClick={() => setRateTx(tx)}>{t('Avaliar')}</button>}
+                                {canRate && <button className="btn btn-primary btn-sm" onClick={() => setRateTx(tx)}>{isBuyer && tx.status === 'paid' ? t('Confirmar e avaliar') : t('Avaliar')}</button>}
                                 <button className="btn btn-ghost btn-sm" onClick={() => showTxDetail(tx.id)}>{t('Ver')}</button>
                               </div>
                             </div>
@@ -376,8 +376,9 @@ function PerfilInner() {
           transactionId={rateTx.id}
           title={rateTx.listing_title}
           counterparty={rateTx.buyer_id === user.id ? rateTx.seller_id : rateTx.buyer_id}
+          releasesEscrow={rateTx.buyer_id === user.id && rateTx.status === 'paid'}
           onClose={() => setRateTx(null)}
-          onRated={() => { loadTxs(); loadMyRep(); }}
+          onRated={() => { loadTxs(); loadMyRep(); loadWallet(); }}
         />
       )}
     </div>

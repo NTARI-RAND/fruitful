@@ -11,7 +11,7 @@ import { LEVELS, LEVEL_LABELS, LEVEL_DESCRIPTIONS, MAX_COMMENT_WORDS, wordCount,
  * A -1 ("No Trust") requires a justifying comment of <=500 words (enforced here and
  * again at the API boundary).
  */
-export default function RatePrompt({ transactionId, title, counterparty, onClose, onRated }) {
+export default function RatePrompt({ transactionId, title, counterparty, releasesEscrow = false, onClose, onRated }) {
   const toast = useToast();
   const { t } = useI18n();
   const [value, setValue] = useState(null);
@@ -29,11 +29,11 @@ export default function RatePrompt({ transactionId, title, counterparty, onClose
     if (commentTooLong) return toast(t('Comentário muito longo'), 'error');
     setLoading(true);
     try {
-      await api('/ratings/transactions/' + transactionId, 'POST', {
+      const res = await api('/ratings/transactions/' + transactionId, 'POST', {
         rating: value,
         comment: comment.trim() || undefined,
       });
-      toast(t('Avaliação registrada!'));
+      toast(res?.escrowReleased ? t('Pagamento liberado ao vendedor!') : t('Avaliação registrada!'));
       onClose();
       onRated?.();
     } catch (e) {
@@ -49,6 +49,12 @@ export default function RatePrompt({ transactionId, title, counterparty, onClose
 
       {title && <p className="text-sm font-semibold text-soil mb-0.5">{title}</p>}
       {counterparty && <p className="text-xs text-text3 mb-4">{t('Avaliando')}: {counterparty}</p>}
+
+      {releasesEscrow && (
+        <div className="mb-4 text-xs bg-wheat/10 border border-wheat/40 rounded-lg p-2.5 text-soil leading-snug">
+          🔒 {t('Ao confirmar, o pagamento retido é liberado ao vendedor.')}
+        </div>
+      )}
 
       {/* level selector — same -1..+4 order as the display */}
       <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(6, 1fr)' }}>
@@ -98,7 +104,7 @@ export default function RatePrompt({ transactionId, title, counterparty, onClose
       </div>
 
       <button className="btn btn-primary w-full mt-2" onClick={submit} disabled={loading || blocked}>
-        {loading ? t('Enviando...') : t('Enviar avaliação')}
+        {loading ? t('Enviando...') : releasesEscrow ? t('Confirmar e liberar') : t('Enviar avaliação')}
       </button>
     </Modal>
   );
