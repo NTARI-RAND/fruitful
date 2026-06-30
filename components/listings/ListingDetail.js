@@ -24,14 +24,21 @@ export default function ListingDetail({ listing, onClose }) {
   const router = useRouter();
   const { t } = useI18n();
   const l = listing;
+  const isPlan = l.post_type === 'plan_producer' || l.post_type === 'plan_consumer';
+  const isConsumerPlan = l.post_type === 'plan_consumer';
 
   async function buy() {
     const q = parseFloat(qty);
     if (!q || q <= 0) return toast(t('Informe a quantidade'), 'error');
     setLoading(true);
     try {
-      await api('/transactions/from-listing', 'POST', { listingId: l.id, quantity: q });
-      toast(t('Compra iniciada! Acesse seu perfil para pagar.'));
+      if (isPlan) {
+        await api('/transactions/from-plan', 'POST', { planId: l.id, quantity: q });
+        toast(t('Contrato iniciado! Acesse seu perfil para pagar.'));
+      } else {
+        await api('/transactions/from-listing', 'POST', { listingId: l.id, quantity: q });
+        toast(t('Compra iniciada! Acesse seu perfil para pagar.'));
+      }
       onClose();
       router.push('/perfil?tab=transacoes');
     } catch (e) {
@@ -116,7 +123,11 @@ export default function ListingDetail({ listing, onClose }) {
           className="btn btn-primary flex-1"
           onClick={buy}
           disabled={loading}>
-          {loading ? t('Aguarde...') : `🛒 ${t('Comprar agora')}`}
+          {loading
+            ? t('Aguarde...')
+            : isConsumerPlan ? `🤝 ${t('Atender pedido')}`
+            : isPlan ? `📋 ${t('Contratar plano')}`
+            : `🛒 ${t('Comprar agora')}`}
         </button>
         <button className="btn btn-ghost" onClick={onClose}>{t('Cancelar')}</button>
       </div>
