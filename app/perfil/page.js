@@ -41,10 +41,8 @@ function PerfilInner() {
   const [txs, setTxs]             = useState(null);
   const [myListings, setMyListings] = useState(null);
   const [newListing, setNewListing] = useState(false);
-  const [depositOpen, setDepositOpen] = useState(false);
-  const [depAmt, setDepAmt]       = useState('');
+  const [fee, setFee]             = useState(null);
   const [txDetail, setTxDetail]   = useState(null);
-  const [loading, setLoading]     = useState(false);
   const [myRep, setMyRep]         = useState(null);
   const [rateTx, setRateTx]       = useState(null);
   const [contractTx, setContractTx] = useState(null);
@@ -70,12 +68,14 @@ function PerfilInner() {
 
   async function loadWallet() {
     try {
-      const [w, h] = await Promise.all([
+      const [w, h, f] = await Promise.all([
         api('/wallet').catch(() => ({ balance: 0 })),
         api('/wallet/history').catch(() => []),
+        api('/payments/fee').catch(() => null),
       ]);
       setWallet(w);
       setHistory(h.history || h || []);
+      setFee(f);
     } catch {}
   }
 
@@ -96,18 +96,8 @@ function PerfilInner() {
     } catch { setMyListings([]); }
   }
 
-  async function doDeposit() {
-    const amt = parseFloat(depAmt);
-    if (!amt || amt <= 0) return toast(t('Informe um valor'), 'error');
-    setLoading(true);
-    try {
-      await api('/payments/pix/create', 'POST', { amount: amt });
-      toast(t('PaymentIntent criado! Verifique o e-mail.'));
-      setDepositOpen(false);
-      setDepAmt('');
-    } catch (e) { toast(e.message, 'error'); }
-    finally { setLoading(false); }
-  }
+  // Wallet top-up removed (JFA §7.3): the in-network unit is earned and spend-only,
+  // never purchasable. Balance grows only from sales settlements and refunds.
 
   async function payTx(id)     { try { await api('/transactions/'+id+'/pay','POST');     toast(t('Pagamento iniciado!'));  loadTxs(); } catch(e){ toast(e.message,'error'); } }
   async function releaseTx(id) { try { await api('/transactions/'+id+'/release','POST'); toast(t('Escrow liberado!'));     loadTxs(); loadWallet(); } catch(e){ toast(e.message,'error'); } }
@@ -126,12 +116,12 @@ function PerfilInner() {
 
   const initials = (user.email || 'U').substring(0, 2).toUpperCase();
   const bal  = wallet?.balance || 0;
-  let inc = 0, out = 0, sales = 0;
+  let out = 0, sales = 0, refunds = 0;
   history.forEach(h => {
     const a = Number(h.amount);
-    if (h.type === 'deposit')  inc   += a;
-    if (h.type === 'purchase') out   += Math.abs(a);
-    if (h.type === 'sale')     sales += a;
+    if (h.type === 'purchase') out     += Math.abs(a);
+    if (h.type === 'sale')     sales   += a;
+    if (h.type === 'refund')   refunds += Math.abs(a);
   });
 
   const TABS = [
@@ -199,12 +189,8 @@ function PerfilInner() {
                   <div className="wallet-card rounded-2xl p-6 flex flex-col">
                     <div className="text-xs font-semibold uppercase tracking-widest text-white/70 mb-1">{t('Saldo disponível')}</div>
                     <div className="font-serif text-4xl font-black text-white mt-1">{formatCurrency(bal)}</div>
-                    <div className="mt-auto pt-6">
-                      <button
-                        onClick={() => setDepositOpen(true)}
-                        className="px-4 py-2 rounded-lg text-sm font-semibold text-white border border-white/30 bg-white/10 hover:bg-white/20 transition-colors">
-                        + {t('Depositar')}
-                      </button>
+                    <div className="mt-auto pt-6 text-xs text-white/70 leading-relaxed">
+                      {t('Ganho na rede — creditado por vendas e reembolsos. Não é comprável nem resgatável por dinheiro.')}
                     </div>
                   </div>
 
@@ -212,15 +198,21 @@ function PerfilInner() {
                   <div className="card-agro p-6 flex flex-col gap-3">
                     <div className="text-xs font-semibold uppercase tracking-widest text-text3 mb-1">{t('Resumo')}</div>
                     {[
-                      ['Total depositado',    formatCurrency(inc),   'text-moss'],
-                      ['Total gasto',         formatCurrency(out),   'text-rust'],
-                      ['Recebido em vendas',  formatCurrency(sales), 'text-moss'],
+                      ['Total gasto',         formatCurrency(out),     'text-rust'],
+                      ['Recebido em vendas',  formatCurrency(sales),   'text-moss'],
+                      ['Reembolsado',         formatCurrency(refunds), 'text-wheat'],
                     ].map(([label, val, cls]) => (
                       <div key={label} className="flex items-center justify-between">
                         <span className="text-sm text-text3">{t(label)}</span>
                         <span className={`text-sm font-semibold ${cls}`}>{val}</span>
                       </div>
                     ))}
+                    {fee && (
+                      <div className="flex items-center justify-between border-t border-[var(--border-c)] pt-2 mt-1">
+                        <span className="text-sm text-text3">{t('Taxa da plataforma')}</span>
+                        <span className="text-sm font-semibold text-soil">{fee.fee_percent}%</span>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -322,24 +314,6 @@ function PerfilInner() {
           </motion.div>
         </AnimatePresence>
       </div>
-
-      {/* ── DEPOSIT MODAL ── */}
-      {depositOpen && (
-        <Modal onClose={() => setDepositOpen(false)} maxWidth="400px">
-          <ModalHeader title={t('Depositar na wallet')} onClose={() => setDepositOpen(false)} />
-          <div className="form-group">
-            <label className="form-label">{t('Valor (R$)')}</label>
-            <input type="number" placeholder="0,00" step="0.01" min="1"
-              className="form-input" value={depAmt} onChange={e => setDepAmt(e.target.value)} />
-          </div>
-          <div className="bg-cream2 border border-[var(--border-c)] rounded-lg p-3 text-sm text-text3 mb-4 leading-relaxed">
-            {t('Pagamento processado com segurança via Stripe. Saldo creditado instantaneamente.')}
-          </div>
-          <button className="btn btn-primary w-full" onClick={doDeposit} disabled={loading}>
-            {loading ? t('Processando...') : t('Confirmar depósito')}
-          </button>
-        </Modal>
-      )}
 
       {/* ── TX DETAIL MODAL ── */}
       {txDetail && (
