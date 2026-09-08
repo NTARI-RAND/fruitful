@@ -11,10 +11,21 @@ const CAT_BG = {
   outros:   'from-cream to-cream2',
 };
 
+// Post-type presentation (whitepaper taxonomy). Falls back to legacy category styling.
+const TYPE_LABEL = { service: 'Service', direct_market: 'Market', product: 'Product', plan_consumer: 'Plan', plan_producer: 'Plan', agrotourism: 'Agrotourism' };
+const TYPE_EMOJI = { service: '🧰', direct_market: '🥕', product: '📦', plan_consumer: '📋', plan_producer: '📋', agrotourism: '🌄' };
+const TYPE_BG = { service: 'from-sky-50 to-cyan-100', product: 'from-violet-50 to-purple-100', agrotourism: 'from-lime-50 to-green-100' };
+
 export default function ListingCard({ listing, onClick }) {
   const { t } = useI18n();
   const l = listing;
-  const bg = CAT_BG[l.category] || CAT_BG.outros;
+  const img = l.media?.[0] || l.images?.[0];
+  const bg = TYPE_BG[l.post_type] || CAT_BG[l.category] || CAT_BG.outros;
+  const emoji = TYPE_EMOJI[l.post_type] || CAT_EMOJI[l.category] || '📦';
+  const badge = l.post_type ? (TYPE_LABEL[l.post_type] || l.post_type) : catLabel(l.category);
+  const hasPrice = l.price !== null && l.price !== undefined && l.price !== '';
+  const qty = Number(l.quantity_available);
+  const hasQty = Number.isFinite(qty) && qty > 0;
 
   return (
     <motion.div
@@ -25,14 +36,14 @@ export default function ListingCard({ listing, onClick }) {
 
       {/* IMAGE / EMOJI AREA */}
       <div className={`listing-img bg-gradient-to-br ${bg} relative`}>
-        {l.images?.[0]
-          ? <img src={l.images[0]} alt={l.title} className="w-full h-full object-cover" />
-          : <span className="text-5xl select-none">{CAT_EMOJI[l.category] || '📦'}</span>
+        {img
+          ? <img src={img} alt={l.title} className="w-full h-full object-cover" />
+          : <span className="text-5xl select-none">{emoji}</span>
         }
         <div className="absolute top-2.5 left-2.5">
-          <span className="badge-agro badge-green text-[10px]">{t(catLabel(l.category))}</span>
+          <span className="badge-agro badge-green text-[10px]">{t(badge)}</span>
         </div>
-        {l.quantity_available <= 10 && (
+        {hasQty && qty <= 10 && (
           <div className="absolute top-2.5 right-2.5">
             <span className="badge-agro badge-rust text-[10px]">{t('Últimas unidades')}</span>
           </div>
@@ -42,16 +53,24 @@ export default function ListingCard({ listing, onClick }) {
       {/* BODY */}
       <div className="listing-body">
         <div className="listing-title line-clamp-2">{l.title}</div>
-        <div className="listing-loc">
-          <span className="text-xs">📍</span> {l.city}, {l.state}
-        </div>
-        <div className="flex items-baseline gap-1 mt-auto pt-2">
-          <span className="listing-price">{formatCurrency(l.price)}</span>
-          <span className="listing-unit">/{l.unit}</span>
-        </div>
-        <div className="listing-qty">
-          {Number(l.quantity_available).toLocaleString('pt-BR')} {t('disponível')}
-        </div>
+        {(l.city || l.state) && (
+          <div className="listing-loc">
+            <span className="text-xs">📍</span> {[l.city, l.state].filter(Boolean).join(', ')}
+          </div>
+        )}
+        {hasPrice ? (
+          <div className="flex items-baseline gap-1 mt-auto pt-2">
+            <span className="listing-price">{formatCurrency(l.price)}</span>
+            {l.unit && <span className="listing-unit">/{l.unit}</span>}
+          </div>
+        ) : l.terms ? (
+          <div className="listing-unit mt-auto pt-2 line-clamp-1">{l.terms}</div>
+        ) : null}
+        {hasQty && (
+          <div className="listing-qty">
+            {qty.toLocaleString('pt-BR')} {t('disponível')}
+          </div>
+        )}
       </div>
     </motion.div>
   );
