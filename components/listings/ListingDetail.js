@@ -1,10 +1,11 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Modal, ModalHeader } from '@/components/ui/Modal';
 import { catLabel, CAT_EMOJI, formatCurrency, formatDate } from '@/lib/format';
 import { Badge } from '@/components/ui/Badge';
 import { api } from '@/lib/api';
+import { getUser } from '@/lib/auth';
 import { useToast } from '@/components/ui/Toast';
 import { useRouter } from 'next/navigation';
 import { useI18n } from '@/lib/i18n';
@@ -24,14 +25,44 @@ export default function ListingDetail({ listing, onClose }) {
   const router = useRouter();
   const { t } = useI18n();
   const l = listing;
+  const isPlan = l.post_type === 'plan_producer' || l.post_type === 'plan_consumer';
+  const isConsumerPlan = l.post_type === 'plan_consumer';
+  const me = getUser();
+  const isOwner = me?.id && l.user_id && me.id === l.user_id;
+  const [messaging, setMessaging] = useState(false);
+  const [alloc, setAlloc] = useState(null);
+
+  useEffect(() => {
+    if (!isPlan) return;
+    api(`/posts/${l.id}/contracts`).then(setAlloc).catch(() => {});
+  }, []);
+
+  async function message() {
+    if (!me) return toast(t('Faça login para enviar mensagens'), 'error');
+    setMessaging(true);
+    try {
+      const c = await api('/conversations', 'POST', { post_id: l.id });
+      onClose();
+      router.push('/chat/' + c.id);
+    } catch (e) {
+      toast(e.message, 'error');
+    } finally {
+      setMessaging(false);
+    }
+  }
 
   async function buy() {
     const q = parseFloat(qty);
     if (!q || q <= 0) return toast(t('Informe a quantidade'), 'error');
     setLoading(true);
     try {
-      await api('/transactions/from-listing', 'POST', { listingId: l.id, quantity: q });
-      toast(t('Compra iniciada! Acesse seu perfil para pagar.'));
+      if (isPlan) {
+        await api('/transactions/from-plan', 'POST', { planId: l.id, quantity: q });
+        toast(t('Contrato iniciado! Acesse seu perfil para pagar.'));
+      } else {
+        await api('/transactions/from-listing', 'POST', { listingId: l.id, quantity: q });
+        toast(t('Compra iniciada! Acesse seu perfil para pagar.'));
+      }
       onClose();
       router.push('/perfil?tab=transacoes');
     } catch (e) {
@@ -76,6 +107,14 @@ export default function ListingDetail({ listing, onClose }) {
         </div>
       </div>
 
+      {/* PLAN SHARE ALLOCATION */}
+      {isPlan && alloc && alloc.total != null && (
+        <div className="text-sm text-text3 mb-4">
+          <span className="font-semibold text-soil">{alloc.allocated}</span> / {alloc.total} {t('contratado')} · {alloc.backer_count} {t('apoiadores')}
+          {alloc.contract_shares === 'none' && <span className="text-rust"> · {t('Plano completo (não divisível)')}</span>}
+        </div>
+      )}
+
       {/* DESCRIPTION */}
       {l.description && (
         <p className="text-sm text-text2 leading-relaxed mb-4">{l.description}</p>
@@ -111,13 +150,24 @@ export default function ListingDetail({ listing, onClose }) {
         )}
       </div>
 
-      <div className="flex gap-3">
-        <button
-          className="btn btn-primary flex-1"
-          onClick={buy}
-          disabled={loading}>
-          {loading ? t('Aguarde...') : `🛒 ${t('Comprar agora')}`}
-        </button>
+      <div className="flex gap-3 flex-wrap">
+        {!isOwner && (
+          <button
+            className="btn btn-primary flex-1"
+            onClick={buy}
+            disabled={loading}>
+            {loading
+              ? t('Aguarde...')
+              : isConsumerPlan ? `🤝 ${t('Atender pedido')}`
+              : isPlan ? `📋 ${t('Contratar plano')}`
+              : `🛒 ${t('Comprar agora')}`}
+          </button>
+        )}
+        {!isOwner && (
+          <button className="btn btn-outline" onClick={message} disabled={messaging}>
+            💬 {t('Mensagem')}
+          </button>
+        )}
         <button className="btn btn-ghost" onClick={onClose}>{t('Cancelar')}</button>
       </div>
     </Modal>
