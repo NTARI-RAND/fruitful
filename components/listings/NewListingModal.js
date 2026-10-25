@@ -1,17 +1,21 @@
 'use client';
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Modal, ModalHeader } from '@/components/ui/Modal';
 import { api } from '@/lib/api';
-import { getToken } from '@/lib/auth';
+import { getToken, getUser } from '@/lib/auth';
+import { createDraftStore, draftOwner } from '@/lib/listing-draft.mjs';
 import { useToast } from '@/components/ui/Toast';
 import { useI18n } from '@/lib/i18n';
 
 const STEPS = ['Informações', 'Fotos', 'Revisão'];
+const EMPTY_FORM = {
+  title: '', category: 'graos', unit: 'saca',
+  price: '', quantity_available: '', city: '', state: '', description: '',
+};
 
-function ImageDropzone({ images, setImages }) {
-  const [uploading, setUploading] = useState(false);
+function ImageDropzone({ images, setImages, uploading, setUploading }) {
   const { t } = useI18n();
 
   const onDrop = useCallback(async (accepted) => {
@@ -32,13 +36,14 @@ function ImageDropzone({ images, setImages }) {
     }
     setImages(prev => [...prev, ...uploaded].slice(0, 5));
     setUploading(false);
-  }, [setImages]);
+  }, [setImages, setUploading]);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
     accept: { 'image/*': ['.jpg', '.jpeg', '.png', '.webp'] },
     maxFiles: 5,
     maxSize: 8 * 1024 * 1024,
+    disabled: uploading,
   });
 
   return (
@@ -91,11 +96,94 @@ export default function NewListingModal({ onClose, onCreated }) {
   const { t } = useI18n();
   const [step, setStep] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [images, setImages] = useState([]);
-  const [form, setForm] = useState({
-    title: '', category: 'graos', unit: 'saca',
-    price: '', quantity_available: '', city: '', state: '', description: '',
+  const [form, setForm] = useState(EMPTY_FORM);
+  const [session] = useState(() => {
+    let storage = null;
+    let owner = null;
+    try { storage = window.localStorage; owner = draftOwner(getUser(), getToken()); } catch {}
+    const store = createDraftStore(storage, owner);
+    return { owner, store, initial: store.read() };
   });
+  const [pendingDraft, setPendingDraft] = useState(session.initial);
+  const [savedAt, setSavedAt] = useState(session.initial.draft?.savedAt || null);
+  const snapshot = JSON.stringify({ form, images, step });
+  const [savedSnapshot, setSavedSnapshot] = useState(snapshot);
+  const [closePrompt, setClosePrompt] = useState(false);
+  const [discardPrompt, setDiscardPrompt] = useState(false);
+  const dirty = snapshot !== savedSnapshot;
+  const busy = loading || uploading;
+  const canSave = session.initial.status !== 'unavailable';
+
+  useEffect(() => {
+    function checkAccount() {
+      let owner = null;
+      try { owner = draftOwner(getUser(), getToken()); } catch {}
+      if (owner !== session.owner) onClose();
+    }
+    function beforeUnload(event) {
+      if (dirty || uploading) { event.preventDefault(); event.returnValue = ''; }
+    }
+    window.addEventListener('auth-change', checkAccount);
+    window.addEventListener('storage', checkAccount);
+    window.addEventListener('beforeunload', beforeUnload);
+    return () => {
+      window.removeEventListener('auth-change', checkAccount);
+      window.removeEventListener('storage', checkAccount);
+      window.removeEventListener('beforeunload', beforeUnload);
+    };
+  }, [dirty, uploading, session.owner, onClose]);
+
+  function sameAccount() {
+    try { return draftOwner(getUser(), getToken()) === session.owner; } catch { return false; }
+  }
+
+  function saveDraft(close = false) {
+    if (busy || !sameAccount()) return;
+    try {
+      const saved = session.store.save({ form, images, step });
+      setSavedAt(saved.savedAt);
+      setSavedSnapshot(snapshot);
+      setClosePrompt(false);
+      toast(t('Rascunho salvo neste dispositivo.'));
+      if (close) onClose();
+    } catch {
+      toast(t('Não foi possível salvar. Verifique o armazenamento do navegador e tente novamente.'), 'error');
+    }
+  }
+
+  function resumeDraft() {
+    if (!sameAccount()) return onClose();
+    const draft = pendingDraft.draft;
+    setForm(draft.form);
+    setImages(draft.images);
+    setStep(draft.step);
+    setSavedSnapshot(JSON.stringify({ form: draft.form, images: draft.images, step: draft.step }));
+    setPendingDraft({ status: 'empty' });
+  }
+
+  function discardDraft() {
+    if (busy || !sameAccount()) return;
+    try {
+      session.store.remove();
+      setPendingDraft({ status: 'empty' });
+      setSavedAt(null);
+      setForm(EMPTY_FORM);
+      setImages([]);
+      setStep(0);
+      setSavedSnapshot(JSON.stringify({ form: EMPTY_FORM, images: [], step: 0 }));
+      setDiscardPrompt(false);
+    } catch {
+      toast(t('Não foi possível descartar o rascunho. Tente novamente.'), 'error');
+    }
+  }
+
+  function requestClose() {
+    if (busy) return;
+    if (dirty) setClosePrompt(true);
+    else onClose();
+  }
 
   function set(k, v) { setForm(f => ({ ...f, [k]: v })); }
 
@@ -108,6 +196,11 @@ export default function NewListingModal({ onClose, onCreated }) {
   }
 
   async function submit() {
+    if (busy || !sameAccount()) return;
+    if (!form.title || !form.price || !form.city || !form.state) {
+      setStep(0);
+      return toast(t('Preencha os campos obrigatórios'), 'error');
+    }
     setLoading(true);
     try {
       await api('/listings', 'POST', {
@@ -118,6 +211,11 @@ export default function NewListingModal({ onClose, onCreated }) {
         images,
       });
       toast(t('Anúncio publicado com sucesso!'));
+      if (savedAt) {
+        try { session.store.remove(); } catch {
+          toast(t('Anúncio publicado, mas o rascunho local não pôde ser removido.'), 'error');
+        }
+      }
       onClose();
       onCreated?.();
     } catch (e) {
@@ -127,9 +225,69 @@ export default function NewListingModal({ onClose, onCreated }) {
     }
   }
 
+  const draftNotice = (
+    <p className="text-xs text-text3 mb-3">
+      {t('Salvo apenas neste navegador para esta conta. Não é criptografado; pessoas com acesso ao dispositivo podem vê-lo. Fotos já enviadas permanecem no servidor.')}
+    </p>
+  );
+
+  if (pendingDraft.status === 'ready' || pendingDraft.status === 'invalid' || discardPrompt || closePrompt) {
+    return (
+      <Modal onClose={requestClose} maxWidth="560px">
+        <ModalHeader title={t('Publicar anúncio')} onClose={requestClose} />
+        {discardPrompt ? (
+          <div role="alert">
+            <h2 className="font-semibold text-soil mb-2">{t('Descartar rascunho?')}</h2>
+            <p className="text-sm text-text3 mb-4">{t('O rascunho e as alterações atuais serão removidos deste navegador. Fotos já enviadas não serão excluídas.')}</p>
+            <div className="flex flex-wrap gap-3">
+              <button className="btn btn-ghost" onClick={() => setDiscardPrompt(false)}>{t('Cancelar')}</button>
+              <button className="btn btn-outline" onClick={discardDraft}>{t('Confirmar descarte')}</button>
+            </div>
+          </div>
+        ) : closePrompt ? (
+          <div>
+            <h2 className="font-semibold text-soil mb-2">{t('Alterações não salvas')}</h2>
+            <p className="text-sm text-text3 mb-4">{t('Salve antes de sair para continuar depois. Fechar sem salvar mantém apenas o último rascunho salvo.')}</p>
+            <div className="flex flex-wrap gap-3">
+              <button className="btn btn-ghost" onClick={() => setClosePrompt(false)}>{t('Continuar editando')}</button>
+              <button className="btn btn-outline" onClick={onClose}>{t('Fechar sem salvar')}</button>
+              {canSave && <button className="btn btn-primary" onClick={() => saveDraft(true)}>{t('Salvar e fechar')}</button>}
+            </div>
+          </div>
+        ) : (
+          <div>
+            <h2 className="font-semibold text-soil mb-2">{t(pendingDraft.status === 'ready' ? 'Continue seu anúncio' : 'Rascunho indisponível')}</h2>
+            {pendingDraft.status === 'ready' ? (
+              <div className="card-agro p-4 mb-4">
+                <p className="font-medium text-soil break-words">{pendingDraft.draft.form.title || t('Sem título')}</p>
+                <p className="text-sm text-text3 mt-1">{t(STEPS[pendingDraft.draft.step])} · {new Date(savedAt).toLocaleString()}</p>
+              </div>
+            ) : <p className="text-sm text-text3 mb-4">{t('O rascunho salvo não pôde ser lido. Descarte-o para começar um novo anúncio.')}</p>}
+            {draftNotice}
+            <div className="flex flex-wrap gap-3">
+              {pendingDraft.status === 'ready' && <button className="btn btn-primary" onClick={resumeDraft}>{t('Retomar rascunho')}</button>}
+              <button className="btn btn-ghost" onClick={() => setDiscardPrompt(true)}>{t('Descartar rascunho')}</button>
+            </div>
+          </div>
+        )}
+      </Modal>
+    );
+  }
+
   return (
-    <Modal onClose={onClose} maxWidth="560px">
-      <ModalHeader title={t('Publicar anúncio')} onClose={onClose} />
+    <Modal onClose={requestClose} maxWidth="560px">
+      <ModalHeader title={t('Publicar anúncio')} onClose={requestClose} />
+
+      <div className="bg-cream2 rounded-lg p-3 mb-5">
+        <p className="text-sm font-medium text-soil mb-1" role="status">
+          {t(!canSave ? 'Rascunhos indisponíveis no modo demo ou sem armazenamento local.' : dirty ? 'Alterações não salvas' : savedAt ? 'Rascunho salvo neste dispositivo.' : 'Salve um rascunho para continuar depois.')}
+        </p>
+        {canSave && draftNotice}
+        <div className="flex flex-wrap gap-2">
+          <button className="btn btn-outline btn-sm" disabled={!canSave || busy} onClick={() => saveDraft()}>{t('Salvar rascunho')}</button>
+          {savedAt && <button className="btn btn-ghost btn-sm" disabled={busy} onClick={() => setDiscardPrompt(true)}>{t('Descartar rascunho')}</button>}
+        </div>
+      </div>
 
       {/* STEP INDICATOR */}
       <div className="flex items-center gap-0 mb-6">
@@ -229,7 +387,7 @@ export default function NewListingModal({ onClose, onCreated }) {
           {step === 1 && (
             <div>
               <p className="text-sm text-text3 mb-4">{t('Adicione fotos do produto. Boas imagens aumentam as chances de venda.')}</p>
-              <ImageDropzone images={images} setImages={setImages} />
+              <ImageDropzone images={images} setImages={setImages} uploading={uploading} setUploading={setUploading} />
             </div>
           )}
 
@@ -273,16 +431,16 @@ export default function NewListingModal({ onClose, onCreated }) {
       {/* NAVIGATION */}
       <div className="flex gap-3 mt-6">
         {step > 0 && (
-          <button className="btn btn-ghost flex-1" onClick={() => setStep(s => s - 1)}>
+          <button className="btn btn-ghost flex-1" disabled={busy} onClick={() => setStep(s => s - 1)}>
             ← {t('Voltar')}
           </button>
         )}
         {step < 2 ? (
-          <button className="btn btn-primary flex-1" onClick={nextStep}>
+          <button className="btn btn-primary flex-1" disabled={busy} onClick={nextStep}>
             {t('Próximo')} →
           </button>
         ) : (
-          <button className="btn btn-primary flex-1" onClick={submit} disabled={loading}>
+          <button className="btn btn-primary flex-1" onClick={submit} disabled={busy}>
             {loading ? t('Publicando...') : `🌾 ${t('Publicar anúncio')}`}
           </button>
         )}

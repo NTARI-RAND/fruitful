@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "next lint",
     "test": "next build",
+    "test:drafts": "node --test tests/listing-draft.test.mjs",
     "federation-status": "node federationStatusCLI.js",
     "federation-status:ci": "BACKEND_URL=$BACKEND_URL node federationStatusCLI.js",
     "test-connection": "node test-connection.js"
