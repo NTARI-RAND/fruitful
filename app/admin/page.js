@@ -8,6 +8,7 @@ import { formatCurrency, formatDate } from '@/lib/format';
 import { StatusBadge, Badge } from '@/components/ui/Badge';
 import { useToast } from '@/components/ui/Toast';
 import AnimatedStat from '@/components/motion/AnimatedStat';
+import DisputeResolveModal from '@/components/admin/DisputeResolveModal';
 import { useI18n } from '@/lib/i18n';
 
 const STAT_CONFIG = [
@@ -32,6 +33,7 @@ export default function Admin() {
   const [stats, setStats] = useState({});
   const [tab, setTab]     = useState('users');
   const [data, setData]   = useState(null);
+  const [resolveTarget, setResolveTarget] = useState(null);
 
   useEffect(() => {
     const u = getUser();
@@ -187,15 +189,12 @@ export default function Admin() {
                         {data.map(d => (
                           <tr key={d.id}>
                             <td className="text-xs text-text3 font-mono">{d.id?.substring(0,8)}…</td>
-                            <td>{d.reason}</td>
+                            <td className="max-w-[320px] truncate">{d.reason}</td>
                             <td><StatusBadge status={d.status} /></td>
                             <td>
-                              {d.status === 'open' && (
-                                <div className="flex gap-1.5">
-                                  <button className="btn btn-primary btn-sm" onClick={() => action(`/admin/disputes/${d.id}/resolve`,'POST',{resolution:'release'},'Liberado')}>{t('Liberar')}</button>
-                                  <button className="btn btn-danger btn-sm" onClick={() => action(`/admin/disputes/${d.id}/resolve`,'POST',{resolution:'refund'},'Reembolsado')}>{t('Reembolsar')}</button>
-                                </div>
-                              )}
+                              {d.status === 'open'
+                                ? <button className="btn btn-primary btn-sm" onClick={() => setResolveTarget(d)}>{t('Resolver')}</button>
+                                : <span className="text-xs text-text3">{d.resolution || d.status}</span>}
                             </td>
                           </tr>
                         ))}
@@ -248,6 +247,14 @@ export default function Admin() {
           </motion.div>
         </AnimatePresence>
       </div>
+
+      {resolveTarget && (
+        <DisputeResolveModal
+          dispute={resolveTarget}
+          onClose={() => setResolveTarget(null)}
+          onResolved={() => { loadTab('disputes'); loadStats(); }}
+        />
+      )}
     </div>
   );
 }
