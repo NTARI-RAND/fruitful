@@ -11,7 +11,8 @@
     "test:drafts": "node --test tests/listing-draft.test.mjs",
     "federation-status": "node federationStatusCLI.js",
     "federation-status:ci": "BACKEND_URL=$BACKEND_URL node federationStatusCLI.js",
-    "test-connection": "node test-connection.js"
+    "test-connection": "node test-connection.js",
+    "test:marketplace": "node --test tests/marketplace.test.mjs"
   },
   "dependencies": {
     "@radix-ui/react-avatar": "^1.1.11",
@@ -41,6 +42,7 @@
     "autoprefixer": "^10.4.27",
     "eslint": "8.56.0",
     "eslint-config-next": "^15.5.25",
+    "playwright": "1.65.0",
     "postcss": "^8.5.9",
     "tailwindcss": "^3.4.19",
     "tailwindcss-animate": "^1.0.7"
