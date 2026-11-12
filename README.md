@@ -26,3 +26,9 @@ Both sub-apps rely on environment variables to communicate with backend services
 - `VITE_API_BASE_URL` – Base URL for the API used by the chat interface.
 - `VITE_API_KEY` – API key used by the chat interface.
 
+
+## Marketplace availability
+
+Failed listing requests show an error and retry action rather than demo inventory.
+See [marketplace loading and recovery](docs/marketplace-loading.md) for behavior,
+verification commands and integration scope.

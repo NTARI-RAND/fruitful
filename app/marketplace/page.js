@@ -1,10 +1,11 @@
 'use client';
-import { useEffect, useState, Suspense } from 'react';
+import { useEffect, useRef, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { api } from '@/lib/api';
 import { getToken } from '@/lib/auth';
-import ListingCard, { ListingCardSkeleton } from '@/components/listings/ListingCard';
+import MarketplaceResults from '@/components/listings/MarketplaceResults';
+import MarketplaceFilters from '@/components/listings/MarketplaceFilters';
 import ListingDetail from '@/components/listings/ListingDetail';
 import NewListingModal from '@/components/listings/NewListingModal';
 import { useI18n } from '@/lib/i18n';
@@ -18,22 +19,23 @@ const CATEGORIES = [
   { value: 'outros',   label: 'Outros',     emoji: '📦' },
 ];
 
-const STATES = ['SP','MG','PR','RS','GO','MT','MS','BA','SC','PE','CE','RO','PA'];
-
-const DEMO = [
-  { id: 'd1', title: 'Soja Safra 2025 — Tipo 1',        category: 'graos',    city: 'Rondonópolis', state: 'MT', price: 145.50, unit: 'saca',  quantity_available: 500  },
-  { id: 'd2', title: 'Milho Granado Premium',            category: 'graos',    city: 'Sorriso',      state: 'MT', price: 78.00,  unit: 'saca',  quantity_available: 1200 },
-  { id: 'd3', title: 'Laranja Pera Rio',                 category: 'frutas',   city: 'Limeira',      state: 'SP', price: 2.80,   unit: 'kg',    quantity_available: 8000 },
-  { id: 'd4', title: 'Nelore Boi Gordo',                 category: 'gado',     city: 'Araçatuba',    state: 'SP', price: 320.00, unit: 'cabeça',quantity_available: 45   },
-  { id: 'd5', title: 'Café Arábica Especial',            category: 'graos',    city: 'Varginha',     state: 'MG', price: 980.00, unit: 'saca',  quantity_available: 30   },
-  { id: 'd6', title: 'Tomate Italiano Hidropônica',      category: 'frutas',   city: 'Cajamar',      state: 'SP', price: 3.20,   unit: 'kg',    quantity_available: 2500 },
-  { id: 'd7', title: 'Trator New Holland T7.240',        category: 'maquinas', city: 'Cascavel',     state: 'PR', price: 480000, unit: 'un.',   quantity_available: 1    },
-  { id: 'd8', title: 'Feijão Carioca Safra Nova',        category: 'graos',    city: 'Uberaba',      state: 'MG', price: 220.00, unit: 'saca',  quantity_available: 150  },
-];
+async function fetchListings({ category, state, minPrice, maxPrice }) {
+  let query = '?status=active&limit=40';
+  if (category) query += '&category=' + category;
+  if (state) query += '&state=' + state;
+  if (minPrice) query += '&minPrice=' + minPrice;
+  if (maxPrice) query += '&maxPrice=' + maxPrice;
+  const data = await api('/listings' + query);
+  const items = Array.isArray(data) ? data : data?.listings;
+  if (!Array.isArray(items)) throw new Error('Invalid listings response');
+  return items;
+}
 
 function MarketplaceInner() {
   const params = useSearchParams();
   const [listings, setListings] = useState(null);
+  const [loadError, setLoadError] = useState(false);
+  const latestRequest = useRef(0);
   const [selected, setSelected]   = useState(null);
   const [newListing, setNewListing] = useState(false);
   const [cat, setCat]   = useState(params.get('cat') || '');
@@ -46,37 +48,29 @@ function MarketplaceInner() {
   const { t } = useI18n();
 
   async function load() {
+    const requestId = ++latestRequest.current;
     setListings(null);
-    let qs = '?status=active&limit=40';
-    if (cat)    qs += '&category=' + cat;
-    if (stateF) qs += '&state=' + stateF;
-    if (minP)   qs += '&minPrice=' + minP;
-    if (maxP)   qs += '&maxPrice=' + maxP;
+    setLoadError(false);
     try {
-      const data = await api('/listings' + qs);
-      let items = data.listings || data || [];
-      if (search) items = items.filter(l =>
-        l.title.toLowerCase().includes(search.toLowerCase()) ||
-        l.city?.toLowerCase().includes(search.toLowerCase())
-      );
-      setListings(items);
+      const items = await fetchListings({ category: cat, state: stateF, minPrice: minP, maxPrice: maxP });
+      if (requestId === latestRequest.current) setListings(items);
     } catch {
-      setListings(DEMO.filter(l => !cat || l.category === cat));
+      if (requestId === latestRequest.current) {
+        setListings([]);
+        setLoadError(true);
+      }
     }
   }
 
-  useEffect(() => { load(); }, [cat, stateF, sort]);
+  useEffect(() => {
+    load();
+    return () => { latestRequest.current += 1; };
+  }, [cat, stateF, sort]);
 
   function openNew() {
     if (!getToken()) return alert(t('Faça login para anunciar'));
     setNewListing(true);
   }
-
-  const filtered = listings?.filter(l =>
-    !search ||
-    l.title.toLowerCase().includes(search.toLowerCase()) ||
-    l.city?.toLowerCase().includes(search.toLowerCase())
-  );
 
   return (
     <div className="min-h-screen bg-cream">
@@ -131,82 +125,18 @@ function MarketplaceInner() {
         className="max-md:grid-cols-1">
 
         {/* ── SIDEBAR FILTERS (desktop always visible, mobile toggle) ── */}
-        <AnimatePresence>
-          <motion.aside
-            key="sidebar"
-            initial={{ opacity: 0, x: -16 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: .35 }}
-            className={`card-agro p-5 sticky top-20 max-md:static ${filtersOpen ? 'block' : 'max-md:hidden'}`}>
+        <MarketplaceFilters
+          state={stateF} onStateChange={setStateF}
+          minPrice={minP} maxPrice={maxP}
+          onMinPriceChange={setMinP} onMaxPriceChange={setMaxP}
+          sort={sort} onSortChange={setSort} visible={filtersOpen} onApply={load}
+        />
 
-            <div className="text-xs font-semibold uppercase tracking-widest text-text3 mb-3">{t('Estado')}</div>
-            <select className="form-input text-sm mb-5 w-full" value={stateF} onChange={e => { setStateF(e.target.value); }}>
-              <option value="">{t('Todos')}</option>
-              {STATES.map(s => <option key={s}>{s}</option>)}
-            </select>
-
-            <div className="text-xs font-semibold uppercase tracking-widest text-text3 mb-3">{t('Preço (R$)')}</div>
-            <div className="flex gap-2 items-center mb-1">
-              <input type="number" placeholder={t('Mín')} value={minP} onChange={e => setMinP(e.target.value)}
-                className="form-input text-sm flex-1" />
-              <span className="text-text3 text-sm">—</span>
-              <input type="number" placeholder={t('Máx')} value={maxP} onChange={e => setMaxP(e.target.value)}
-                className="form-input text-sm flex-1" />
-            </div>
-            <button className="btn btn-ghost btn-sm w-full mt-2" onClick={load}>{t('Aplicar filtros')}</button>
-
-            <div className="divider my-4" />
-
-            <div className="text-xs font-semibold uppercase tracking-widest text-text3 mb-3">{t('Ordenar por')}</div>
-            {[['recent','Mais recentes'],['price_asc','Menor preço'],['price_desc','Maior preço']].map(([v,l]) => (
-              <label key={v} className={`filter-option ${sort === v ? 'active' : ''}`}>
-                <input type="radio" className="sr-only" checked={sort === v} onChange={() => setSort(v)} />
-                <span className={`w-3 h-3 rounded-full border-2 flex-shrink-0 transition-colors ${sort === v ? 'bg-moss border-moss' : 'border-[var(--border-c2)]'}`} />
-                {t(l)}
-              </label>
-            ))}
-          </motion.aside>
-        </AnimatePresence>
-
-        {/* ── LISTING GRID ── */}
-        <div>
-          <div className="flex items-center justify-between mb-4">
-            <span className="text-sm text-text3">
-              {listings === null
-                ? t('Buscando...')
-                : `${filtered?.length || 0} ${(filtered?.length || 0) !== 1 ? t('produtos encontrados') : t('produto encontrado')}`}
-            </span>
-          </div>
-
-          <AnimatePresence mode="wait">
-            {listings === null ? (
-              <div key="skeletons" className="listing-grid">
-                {Array(8).fill(0).map((_, i) => <ListingCardSkeleton key={i} />)}
-              </div>
-            ) : filtered?.length ? (
-              <div key="grid" className="listing-grid">
-                {filtered.map((l, i) => (
-                  <motion.div
-                    key={l.id}
-                    initial={{ opacity: 0, y: 16 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: .3, delay: i * .04 }}>
-                    <ListingCard listing={l} onClick={setSelected} />
-                  </motion.div>
-                ))}
-              </div>
-            ) : (
-              <motion.div
-                key="empty"
-                initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-                className="flex flex-col items-center py-20 gap-3">
-                <span className="text-5xl">🌾</span>
-                <p className="text-text3 text-sm">{t('Nenhum produto encontrado')}</p>
-                <button className="btn btn-ghost btn-sm" onClick={() => { setCat(''); setSearch(''); setStateF(''); load(); }}>{t('Limpar filtros')}</button>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
+        <MarketplaceResults
+          listings={listings} loadError={loadError} search={search}
+          onRetry={load} onSelect={setSelected}
+          onClear={() => { setCat(''); setSearch(''); setStateF(''); load(); }}
+        />
       </div>
 
       {selected   && <ListingDetail listing={selected} onClose={() => setSelected(null)} />}
