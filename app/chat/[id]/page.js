@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useState, useRef, useCallback } from 'react';
+import Link from 'next/link';
 import { useRouter, useParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { api } from '@/lib/api';
@@ -145,9 +146,12 @@ export default function ChatRoom() {
 
       {/* ── HEADER ── */}
       <div className="flex items-center gap-3 px-4 py-3 border-b border-[var(--border-c)] bg-cream2/80 backdrop-blur-sm sticky top-0 z-10">
-        <button onClick={() => router.push('/chat')} className="p-1.5 rounded-lg hover:bg-cream3 transition-colors text-text2">
+        <Link
+          href="/chat"
+          aria-label={t('Voltar para mensagens')}
+          className="p-1.5 rounded-lg hover:bg-cream3 transition-colors text-text2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-moss">
           ←
-        </button>
+        </Link>
         <Avatar className="w-9 h-9">
           <AvatarFallback className="bg-moss-light text-moss text-sm font-bold">
             {otherName.substring(0, 2).toUpperCase()}

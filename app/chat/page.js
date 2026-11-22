@@ -1,5 +1,6 @@
 'use client';
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { api } from '@/lib/api';
@@ -8,19 +9,25 @@ import { formatDate } from '@/lib/format';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { useI18n } from '@/lib/i18n';
 
-function ConversationItem({ conv, user, onClick }) {
+const MotionLink = motion.create(Link);
+
+function ConversationItem({ conv, user }) {
   const { t } = useI18n();
-  const other = conv.buyer_id === user?.id ? conv.seller_name : conv.buyer_name;
-  const otherInitials = (other || 'U').substring(0, 2).toUpperCase();
+  const participant = conv.buyer_id === user?.id ? conv.seller_name : conv.buyer_name;
+  const name = participant || t('Usuário');
+  const otherInitials = (participant || 'U').substring(0, 2).toUpperCase();
+  const label = conv.listing_title ? `${name} · ${conv.listing_title}` : name;
   const last = conv.last_message;
   const unread = conv.unread_count || 0;
 
   return (
-    <motion.div
+    <MotionLink
+      href={`/chat/${conv.id || conv.transaction_id}`}
+      prefetch={false}
+      aria-label={label}
       whileHover={{ x: 4 }}
       transition={{ type: 'spring', stiffness: 500, damping: 40 }}
-      onClick={onClick}
-      className={`flex items-center gap-3 px-4 py-3.5 cursor-pointer rounded-xl transition-colors ${unread ? 'bg-moss-light/60' : 'hover:bg-cream2'}`}>
+      className={`flex items-center gap-3 px-4 py-3.5 cursor-pointer rounded-xl transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-moss ${unread ? 'bg-moss-light/60' : 'hover:bg-cream2'}`}>
       <div className="relative flex-shrink-0">
         <Avatar className="w-11 h-11">
           <AvatarFallback className="bg-moss-light text-moss text-sm font-bold">
@@ -35,14 +42,14 @@ function ConversationItem({ conv, user, onClick }) {
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between gap-2">
-          <span className={`text-sm truncate ${unread ? 'font-semibold text-soil' : 'font-medium text-soil'}`}>{other || t('Usuário')}</span>
+          <span className={`text-sm truncate ${unread ? 'font-semibold text-soil' : 'font-medium text-soil'}`}>{name}</span>
           {conv.last_message_at && (
             <span className="text-[10px] text-text3 flex-shrink-0">{formatDate(conv.last_message_at)}</span>
           )}
         </div>
         <div className="text-xs text-text3 truncate mt-0.5">{conv.listing_title && <span className="text-moss font-medium">🌾 {conv.listing_title} · </span>}{last || t('Nenhuma mensagem')}</div>
       </div>
-    </motion.div>
+    </MotionLink>
   );
 }
 
@@ -136,11 +143,7 @@ export default function ChatList() {
                   initial={{ opacity: 0, y: 8 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: i * .04 }}>
-                  <ConversationItem
-                    conv={conv}
-                    user={user}
-                    onClick={() => router.push(`/chat/${conv.id || conv.transaction_id}`)}
-                  />
+                  <ConversationItem conv={conv} user={user} />
                 </motion.div>
               ))}
             </AnimatePresence>
