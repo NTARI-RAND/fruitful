@@ -5,6 +5,17 @@ This directory hosts the web interfaces for Fruitful.
 The Next.js listing form supports explicitly saved, browser-local drafts. See
 [listing drafts](docs/listing-drafts.md) for usage, privacy limits, and checks.
 
+## Chat browser tests
+
+Install Playwright's Chromium browser before running the chat navigation tests
+on a fresh checkout.
+
+```sh
+npm ci
+npx playwright install chromium
+npm run test:chat
+```
+
 ## Sub-apps
 
 - `app/` – Next.js site providing the main user interface.
