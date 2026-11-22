@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -13,18 +13,26 @@ const MotionLink = motion.create(Link);
 
 function ConversationItem({ conv, user }) {
   const { t } = useI18n();
+  const rowId = useId();
+  const previewId = `${rowId}-preview`;
+  const timeId = `${rowId}-time`;
+  const unreadId = `${rowId}-unread`;
   const participant = conv.buyer_id === user?.id ? conv.seller_name : conv.buyer_name;
   const name = participant || t('Usuário');
   const otherInitials = (participant || 'U').substring(0, 2).toUpperCase();
   const label = conv.listing_title ? `${name} · ${conv.listing_title}` : name;
   const last = conv.last_message;
   const unread = conv.unread_count || 0;
+  const descriptionIds = [previewId];
+  if (conv.last_message_at) descriptionIds.push(timeId);
+  if (unread > 0) descriptionIds.push(unreadId);
 
   return (
     <MotionLink
       href={`/chat/${conv.id || conv.transaction_id}`}
       prefetch={false}
       aria-label={label}
+      aria-describedby={descriptionIds.join(' ')}
       whileHover={{ x: 4 }}
       transition={{ type: 'spring', stiffness: 500, damping: 40 }}
       className={`flex items-center gap-3 px-4 py-3.5 cursor-pointer rounded-xl transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-moss ${unread ? 'bg-moss-light/60' : 'hover:bg-cream2'}`}>
@@ -35,19 +43,27 @@ function ConversationItem({ conv, user }) {
           </AvatarFallback>
         </Avatar>
         {unread > 0 && (
-          <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-rust text-white text-[9px] font-bold rounded-full flex items-center justify-center">
-            {unread > 9 ? '9+' : unread}
-          </span>
+          <>
+            <span aria-hidden="true" className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-rust text-white text-[9px] font-bold rounded-full flex items-center justify-center">
+              {unread > 9 ? '9+' : unread}
+            </span>
+            <span id={unreadId} className="sr-only">
+              {unread} {t(unread === 1 ? 'mensagem não lida' : 'mensagens não lidas')}
+            </span>
+          </>
         )}
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between gap-2">
           <span className={`text-sm truncate ${unread ? 'font-semibold text-soil' : 'font-medium text-soil'}`}>{name}</span>
           {conv.last_message_at && (
-            <span className="text-[10px] text-text3 flex-shrink-0">{formatDate(conv.last_message_at)}</span>
+            <span id={timeId} className="text-[10px] text-text3 flex-shrink-0">{formatDate(conv.last_message_at)}</span>
           )}
         </div>
-        <div className="text-xs text-text3 truncate mt-0.5">{conv.listing_title && <span className="text-moss font-medium">🌾 {conv.listing_title} · </span>}{last || t('Nenhuma mensagem')}</div>
+        <div className="text-xs text-text3 truncate mt-0.5">
+          {conv.listing_title && <span className="text-moss font-medium">🌾 {conv.listing_title} · </span>}
+          <span id={previewId}>{last || t('Nenhuma mensagem')}</span>
+        </div>
       </div>
     </MotionLink>
   );

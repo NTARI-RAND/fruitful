@@ -12,11 +12,17 @@ const conversations = [
     id: 'room-corn', transaction_id: 'trade-corn',
     buyer_id: user.id, buyer_name: user.name, seller_id: 'seller-1', seller_name: 'Ana Costa',
     listing_title: 'Sweet corn', last_message: 'The corn is ready.', unread_count: 1,
+    last_message_at: '2026-11-20T12:00:00Z',
   },
   {
     transaction_id: 'trade-beans',
     buyer_id: user.id, buyer_name: user.name, seller_id: 'seller-1', seller_name: 'Ana Costa',
     listing_title: 'Black beans', last_message: 'The beans are packed.', unread_count: 0,
+  },
+  {
+    id: 'room-rice',
+    buyer_id: user.id, buyer_name: user.name, seller_id: 'seller-1', seller_name: 'Ana Costa',
+    listing_title: 'Brown rice', last_message: 'The rice is packed.', unread_count: 12,
   },
 ];
 
@@ -74,7 +80,9 @@ after(async () => {
 });
 
 async function chatPage(t, path = '/chat', language = 'en') {
-  const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  const context = await browser.newContext({
+    viewport: { width: 1280, height: 900 }, timezoneId: 'UTC',
+  });
   t.after(() => context.close());
   await context.addInitScript(({ user, language }) => {
     localStorage.setItem('agri_user', JSON.stringify(user));
@@ -99,6 +107,8 @@ async function chatPage(t, path = '/chat', language = 'en') {
   await context.routeWebSocket('**/socket.io/**', socket => socket.close());
   const page = await context.newPage();
   page.setDefaultTimeout(5_000);
+  // The first room navigation can include Next.js compiling the dynamic route.
+  page.setDefaultNavigationTimeout(30_000);
   await page.goto(url + path);
   return page;
 }
@@ -126,6 +136,34 @@ async function assertFocusOutline(control) {
   assert.equal(focus.focusVisible, true, 'The control should match :focus-visible');
   assert.notEqual(focus.outlineStyle, 'none', 'The keyboard-focused control should have an outline');
   assert.ok(focus.outlineWidth >= 2, 'The keyboard focus outline should be at least 2px wide');
+}
+
+for (const [language, singular, plural] of [
+  ['en', '1 unread message', '12 unread messages'],
+  ['pt', '1 mensagem não lida', '12 mensagens não lidas'],
+]) {
+  test(`Chat links expose message details to Chromium accessibility in ${language}`, async t => {
+    const page = await chatPage(t, '/chat', language);
+    await page.getByRole('link', { name: 'Ana Costa · Brown rice', exact: true }).waitFor();
+    const session = await page.context().newCDPSession(page);
+    try {
+      const { nodes } = await session.send('Accessibility.getFullAXTree');
+      const descriptionFor = listing => nodes.find(node =>
+        node.role?.value === 'link' && node.name?.value === `Ana Costa · ${listing}`
+      )?.description?.value;
+
+      const corn = descriptionFor('Sweet corn');
+      assert.ok(corn, 'The named conversation link must have an accessible description');
+      assert.ok(corn.includes('The corn is ready.'), corn);
+      assert.ok(corn.includes('20/11/26'), corn);
+      assert.ok(corn.includes('12:00'), corn);
+      assert.ok(corn.includes(singular), corn);
+      assert.equal(descriptionFor('Black beans'), 'The beans are packed.');
+      assert.equal(descriptionFor('Brown rice'), `The rice is packed. ${plural}`);
+    } finally {
+      await session.detach();
+    }
+  });
 }
 
 for (const [listing, room, message] of [
