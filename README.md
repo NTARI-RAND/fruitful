@@ -1,28 +1,28 @@
-# Frontend
+# Fruitful
 
-This directory hosts the web interfaces for Fruitful.
+Fruitful is a single Next.js app. Run it from the repository root. Routes live
+in `app/`, including chat in `app/chat/`.
 
-The Next.js listing form supports explicitly saved, browser-local drafts. See
+The listing form supports explicitly saved, browser-local drafts. See
 [listing drafts](docs/listing-drafts.md) for usage, privacy limits, and checks.
 
-## Sub-apps
+## Run locally
 
-- `app/` – Next.js site providing the main user interface.
-- `chat-ui/` – Conversational interface built with Vite and React. See [chat-ui/ARCHITECTURE.md](chat-ui/ARCHITECTURE.md) for architectural details.
+Install dependencies with `npm ci`. To use a particular backend, create
+`.env.local` in the repository root and set its API base URL.
 
-## Environment variables
+```dotenv
+NEXT_PUBLIC_API_URL=http://localhost:5000
+```
 
-Both sub-apps rely on environment variables to communicate with backend services.
+Use your backend's API base, including any path prefix it requires, without a
+trailing slash. The shared API client and home-page listing requests fall back
+to `http://localhost:5000` when the variable is unset.
 
-### Next.js (`app/`)
+Start the development server with `npm run dev`. For production, set
+`NEXT_PUBLIC_API_URL` before running `npm run build`. The build embeds the
+value in the browser bundle, so changing the backend URL requires a rebuild.
 
-- `NEXT_PUBLIC_BACKEND_URL` – Base URL for backend API requests.
-- `NEXT_PUBLIC_API_KEY` – API key used to authorize requests from the Next.js site.
-- `NEXT_PUBLIC_APPSYNC_GRAPHQL_ENDPOINT` – AppSync GraphQL endpoint URL.
-- `NEXT_PUBLIC_APPSYNC_API_KEY` – API key for AppSync requests.
-
-### Chat UI (`chat-ui/`)
-
-- `VITE_API_BASE_URL` – Base URL for the API used by the chat interface.
-- `VITE_API_KEY` – API key used by the chat interface.
-
+If `NEXT_PUBLIC_API_KEY` is set, the shared API client sends it as the
+`X-API-Key` header. Both `NEXT_PUBLIC_*` values are visible to browser users.
+Keep privileged keys and other secrets on the server.
