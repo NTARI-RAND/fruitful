@@ -15,7 +15,13 @@ export function ToastProvider({ children }) {
   return (
     <ToastContext.Provider value={toast}>
       {children}
-      <div className="toast-wrap">
+      <div className="sr-only" role="status" aria-atomic="false" aria-relevant="additions">
+        {toasts.filter(t => t.type !== 'error').map(t => <div key={t.id}>{t.msg}</div>)}
+      </div>
+      <div className="sr-only" role="alert" aria-atomic="false" aria-relevant="additions">
+        {toasts.filter(t => t.type === 'error').map(t => <div key={t.id}>{t.msg}</div>)}
+      </div>
+      <div className="toast-wrap" aria-hidden="true">
         {toasts.map(t => (
           <div key={t.id} className={`toast ${t.type}`}>{t.msg}</div>
         ))}

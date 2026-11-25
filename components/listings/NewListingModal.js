@@ -115,6 +115,7 @@ export default function NewListingModal({ onClose, onCreated }) {
   const dirty = snapshot !== savedSnapshot;
   const busy = loading || uploading;
   const canSave = session.initial.status !== 'unavailable';
+  const draftIsSaved = canSave && !dirty && Boolean(savedAt);
 
   useEffect(() => {
     function checkAccount() {
@@ -279,8 +280,12 @@ export default function NewListingModal({ onClose, onCreated }) {
       <ModalHeader title={t('Publicar anúncio')} onClose={requestClose} />
 
       <div className="bg-cream2 rounded-lg p-3 mb-5">
-        <p className="text-sm font-medium text-soil mb-1" role="status">
-          {t(!canSave ? 'Rascunhos indisponíveis no modo demo ou sem armazenamento local.' : dirty ? 'Alterações não salvas' : savedAt ? 'Rascunho salvo neste dispositivo.' : 'Salve um rascunho para continuar depois.')}
+        <p className="text-sm font-medium text-soil mb-1">
+          {/* The toast announces a successful save. Keep the saved state readable without announcing it twice. */}
+          <span role="status">
+            {!draftIsSaved && t(!canSave ? 'Rascunhos indisponíveis no modo demo ou sem armazenamento local.' : dirty ? 'Alterações não salvas' : 'Salve um rascunho para continuar depois.')}
+          </span>
+          {draftIsSaved && t('Rascunho salvo neste dispositivo.')}
         </p>
         {canSave && draftNotice}
         <div className="flex flex-wrap gap-2">
